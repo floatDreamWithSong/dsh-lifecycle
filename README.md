@@ -9,8 +9,6 @@
 
 ## 界面预览
 
-以下为本地演示环境的实际界面，未包含生产账户或会话信息。
-
 ![锁屏界面](assets/screenshots/lock-screen.png)
 
 ![登录与安全](assets/screenshots/security-settings.png)
