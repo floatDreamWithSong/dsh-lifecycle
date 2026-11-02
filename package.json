@@ -65,5 +65,9 @@
   },
   "bin": {
     "dsh-lifecycle-reset": "scripts/reset.mjs"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   }
 }

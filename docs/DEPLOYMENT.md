@@ -41,10 +41,11 @@ location / {
 
 电源操作由本仓库提供的 root systemd 服务执行，DSH 重启时它会继续运行。控制端仅使用 Unix socket，不开放公网端口。它可以停止、启动或升级配置中的固定服务；仅应让可信用户访问这个单用户 Harness。
 
-先完成源码构建和插件安装，再在仓库根目录执行：
+安装插件后，在服务器执行。`lifecycle_dir` 指向当前 web profile 中的插件安装目录，以下为示例路径：
 
 ```bash
-sudo node scripts/install-systemd.mjs \
+lifecycle_dir=/var/lib/deepseek-harness/.dsh/profiles/web/node_modules/dsh-lifecycle
+sudo node "$lifecycle_dir/scripts/install-systemd.mjs" \
   --service deepseek-harness.service \
   --user deepseek-harness \
   --home /var/lib/deepseek-harness \

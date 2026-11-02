@@ -12,16 +12,10 @@
 需要 Node.js **≥ 22.18** 和 DSH Web。当前验证版本为 **DSH 0.2.1-rc.5**；电源操作还需要 Linux、systemd 和本仓库提供的电源控制服务。
 
 ```bash
-git clone https://github.com/floatDreamWithSong/dsh-lifecycle.git
-cd dsh-lifecycle
-npm ci
-npm pack
-
-# 使用运行 Harness 的账户，以及相同的 HOME / DSH_HOME 安装
-dsh plugin --profile web add "$PWD/dsh-lifecycle-0.1.2.tgz"
+dsh plugin --profile web add dsh-lifecycle
 ```
 
-`npm pack` 会自动构建并生成安装包。
+请使用运行 Harness 的账户，以及相同的 HOME / DSH_HOME 安装。
 
 安装后按[部署说明](docs/DEPLOYMENT.md)配置 HTTPS，并安装本仓库提供的电源控制服务，再重启 Harness。
 
