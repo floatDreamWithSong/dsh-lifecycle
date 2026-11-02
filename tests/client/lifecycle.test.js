@@ -2,6 +2,35 @@ import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { generateTOTP } from '../../lib/totp.js';
 const password = 'Preview-Admin-123!';
+
+test('waking the lock screen does not add transient document overflow', async ({ page, request }) => {
+  await reset(request);
+  await page.goto('/login');
+  await expect(page.getByRole('button', { name: '唤醒并登录 Admin' })).toBeVisible();
+  const frames = await page.evaluate(async () => {
+    document.querySelector('.lock').click();
+    const samples = [];
+    const start = performance.now();
+    await new Promise(resolve => {
+      const sample = () => {
+        const root = document.documentElement;
+        samples.push({ overflow: root.scrollHeight - root.clientHeight, width: root.clientWidth });
+        if (performance.now() - start < 650) requestAnimationFrame(sample);
+        else resolve();
+      };
+      requestAnimationFrame(sample);
+    });
+    return samples;
+  });
+  expect(Math.max(...frames.map(frame => frame.overflow))).toBe(0);
+  expect(new Set(frames.map(frame => frame.width)).size).toBe(1);
+  await expect(page.getByRole('textbox', { name: '输入密码', exact: true })).toBeFocused();
+  // Content on short screens must still scroll to the last login control.
+  await page.setViewportSize({ width: 390, height: 300 });
+  await page.getByRole('button', { name: '密码登录', exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: '密码登录', exact: true })).toBeInViewport();
+});
+
 async function reset(request, initial = false) { await request.post('http://127.0.0.1:54622/reset' + (initial ? '?initial=1' : '')); }
 async function login(page, secret = password) {
   await page.goto('/login');await expect(page.getByRole('button', { name: '唤醒并登录 Admin' })).toBeVisible();await page.keyboard.press('Enter');
