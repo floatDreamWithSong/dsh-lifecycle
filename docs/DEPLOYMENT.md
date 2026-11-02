@@ -1,4 +1,4 @@
-# 部署、迁移与恢复
+# 部署与恢复
 
 本文面向管理员。示例假设 Harness 由 `deepseek-harness` 账户运行，systemd 服务为 `deepseek-harness.service`，安装在 `/opt/deepseek-harness`。请按实际环境替换，操作前备份 profile 和数据目录。
 
@@ -35,11 +35,11 @@ location / {
 }
 ```
 
-启动 DSH 时设置实际的 `--public-url https://dsh.example.com/` 和 `--trusted-host dsh.example.com`。图库等其他插件若有自己的域名白名单，也需单独更新。
+启动 DSH 时设置实际的 `--public-url https://dsh.example.com/` 和 `--trusted-host dsh.example.com`。
 
-## 独立电源服务
+## 安装电源服务
 
-电源操作由独立的 root systemd 服务执行，DSH 重启时它会继续运行。控制端仅使用 Unix socket，不开放公网端口。它可以停止、启动或升级配置中的固定服务；仅应让可信用户访问这个单用户 Harness。
+电源操作由本仓库提供的 root systemd 服务执行，DSH 重启时它会继续运行。控制端仅使用 Unix socket，不开放公网端口。它可以停止、启动或升级配置中的固定服务；仅应让可信用户访问这个单用户 Harness。
 
 先完成源码构建和插件安装，再在仓库根目录执行：
 
@@ -66,16 +66,6 @@ sudo systemctl restart deepseek-harness.service
 | `/run/dsh-lifecycle/control.sock` | 本地控制 socket，服务所属组可访问 |
 
 默认检查 npm `latest`，也支持 `next`、`alpha`。检测到更高版本才显示更新操作。更新先暂存安装、验证 CLI，再切换并重启；启动失败会尝试恢复旧安装。管理员应保留可用备份，并定期清理暂存与旧安装目录。
-
-## 从旧插件迁移
-
-1. 停止 Harness，备份 profile 中的 `package.json`、锁文件和 `cordis.patch.yml`，以及下述数据目录。
-2. 安装本插件后，从 `package.json` 的 `dsh.profile.bundles` 移除 `dsh-auth-gateway`、`dsh-power-menu`，保留一份 `dsh-lifecycle`。
-3. 将旧 `dsh-auth-gateway` patch 的 ID 改成 `dsh-lifecycle`，保留原有网关配置；移除旧电源插件的专属 patch。不要改动其他插件配置。
-4. 安装本插件的独立控制服务，再启动 Harness，确认登录与电源菜单正常。
-5. 确认替换成功后，停用旧的 `dsh-power-menu.service`，避免两套控制器同时管理同一服务。
-
-沿用 `auth-gateway/` 中的密码散列、OTP 加密记录和主密钥，也兼容原 `DSH_AUTH_GATEWAY_MASTER_KEY`。不要删除或重新生成这些数据。已有 OTP 的实例默认继续两步模式；旧插件的内存会话不能迁移，首次切换需重新登录。
 
 ## 数据和登录恢复
 
