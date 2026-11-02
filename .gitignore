@@ -1,0 +1,16 @@
+node_modules/
+*.tgz
+test-results/
+playwright-report/
+.DS_Store
+coverage/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+.dsh/
+auth-gateway/
+lifecycle/
