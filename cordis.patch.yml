@@ -37,8 +37,11 @@
 #   openBrowser      must keep flowing from the CLI flags — the web-app schema
 #                    default is TRUE, so omitting it makes `dsh web --no-open`
 #                    ineffective and pops a browser tab on every boot;
-#   publicUrl        must keep flowing too, or an operator's `--public-url` is
-#                    silently dropped. It is display-only (dsh's own help says
+#   publicUrl        preserves an operator's `--public-url`; otherwise it must
+#                    name the gateway, not webServer's internal listener.
+#                    This override belongs only to this bundle layer, so removing
+#                    the plugin restores the web-app's original URL selection.
+#                    It is display-only (dsh's own help says
 #                    it "grants no trust") and feeds the printed/opened URL,
 #                    DSH_WEB_URL, and — since 0.2.1-alpha.3 — the runtime
 #                    context line `Current DeepSeek Harness Web GUI URL`.
@@ -56,7 +59,7 @@
     printUrl: false
     surfaceContext: true
     openBrowser: !!js ctx.webStartup.openBrowser
-    publicUrl: !!js ctx.webStartup.publicUrl
+    publicUrl: !!js ctx.webStartup.publicUrl ?? ('http://127.0.0.1:' + (ctx.webStartup.port ?? 3080))
     trustedHosts: !!js ctx.webStartup.trustedHosts
 
 - insert:
