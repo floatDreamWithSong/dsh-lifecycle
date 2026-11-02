@@ -1,7 +1,7 @@
 {
   "name": "dsh-lifecycle",
-  "version": "0.1.4",
-  "description": "Windows-inspired lock screen, persistent authentication and systemd lifecycle controls for DeepSeek Harness.",
+  "version": "0.1.5",
+  "description": "Windows-inspired lock screen, persistent authentication and systemd/launchd lifecycle controls for DeepSeek Harness.",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -17,6 +17,7 @@
     "dist",
     "cordis.patch.yml",
     "scripts/install-systemd.mjs",
+    "scripts/install-launchd.mjs",
     "README.md",
     "docs",
     "LICENSE",

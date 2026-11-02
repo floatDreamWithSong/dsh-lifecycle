@@ -37,7 +37,7 @@ location / {
 
 启动 DSH 时设置实际的 `--public-url https://dsh.example.com/` 和 `--trusted-host dsh.example.com`。
 
-## 安装电源服务
+## Linux 电源服务
 
 电源操作由本仓库提供的 root systemd 服务执行，DSH 重启时它会继续运行。控制端仅使用 Unix socket，不开放公网端口。它可以停止、启动或升级配置中的固定服务；仅应让可信用户访问这个单用户 Harness。
 
@@ -67,6 +67,37 @@ sudo systemctl restart deepseek-harness.service
 | `/run/dsh-lifecycle/control.sock` | 本地控制 socket，服务所属组可访问 |
 
 默认检查 npm `latest`，也支持 `next`、`alpha`。检测到更高版本才显示更新操作。更新先暂存安装、验证 CLI，再切换并重启；启动失败会尝试恢复旧安装。管理员应保留可用备份，并定期清理暂存与旧安装目录。
+
+## macOS 电源服务
+
+以当前桌面用户运行，不使用 sudo。安装器创建两个用户 LaunchAgent：一个运行 Harness，另一个独立处理电源请求。关机只停止 Harness，控制服务继续运行；不关闭 Mac。服务随桌面用户登录启动，退出该用户后停止。
+
+先在原终端停止正在运行的 Harness，再安装。源码构建示例，在 Harness 仓库根目录执行：
+
+```bash
+lifecycle_dir="$HOME/.dsh/profiles/web/node_modules/dsh-lifecycle"
+node "$lifecycle_dir/scripts/install-launchd.mjs" \
+  --cwd "$PWD" \
+  --source-manifest "$PWD/package.json" \
+  --node "$(command -v node)" \
+  -- "$(command -v node)" --import tsx/esm apps/cli/src/bin.ts web --no-open
+```
+
+这会托管原来的启动命令，之后从页面重启，无需保持终端打开。请勿再同时执行 `pnpm dsh web` 占用相同端口。自定义端口时，安装器的 `--port` 和启动命令中的 `--port` 必须一致；使用自定义 `DSH_HOME` 时，在运行安装器前设置该变量。
+
+源码构建显示当前版本，保留重启与停止，隐藏更新操作；不会自动拉取 Git、更改分支或覆盖源码。更新源码后可从页面重新启动。npm 管理的独立 Harness 安装可以用 `--install-root /绝对安装目录 --npm /绝对路径/npm` 替代 `--source-manifest`，启动命令需指向该安装目录中的 CLI；此模式支持更新及失败回滚。不要把全局共享的 npm 前缀作为安装目录。
+
+配置、独立控制程序和日志位于 `~/Library/Application Support/dsh-lifecycle/`，目录仅当前用户可访问。认证数据仍在原来的 `DSH_HOME`，不会迁移或重置。
+
+```bash
+# 查看日志
+tail -n 60 "$HOME/Library/Application Support/dsh-lifecycle/controller.log"
+tail -n 60 "$HOME/Library/Application Support/dsh-lifecycle/harness.log"
+# 页面关机后，手动重新启动
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/net.deepseek.dsh-lifecycle.harness.plist"
+```
+
+升级插件不会自动替换已复制的独立控制程序。升级控制程序或修改启动参数时，先按下面的卸载步骤停用两个 LaunchAgent，备份并移走原来的配置目录，再运行安装器；保留认证数据目录。
 
 ## 数据和登录恢复
 
@@ -108,3 +139,10 @@ sudo systemctl start deepseek-harness.service
 停止 Harness，先从 profile 移除本插件 bundle 与专属 patch，并恢复需要的原始 Web 端口配置，再启动。若原服务使用密码网关保护，移除网关后应先检查反向代理和访问范围。
 
 独立控制服务可用 `sudo systemctl disable --now dsh-lifecycle.service` 停用。卸载插件不等于删除凭据；数据目录由管理员备份、保留或手工清理，本仓库不提供一键清空凭据的卸载脚本。
+
+macOS 先执行以下命令停用托管服务；如果已从页面关机，第一条可能提示服务未加载。随后将两个 plist 移出 `~/Library/LaunchAgents/`，避免下次登录自动启动。保留或备份控制配置与认证数据，再按平时的命令手动启动 DSH。
+
+```bash
+launchctl bootout --wait "gui/$(id -u)/net.deepseek.dsh-lifecycle.harness"
+launchctl bootout --wait "gui/$(id -u)/net.deepseek.dsh-lifecycle"
+```

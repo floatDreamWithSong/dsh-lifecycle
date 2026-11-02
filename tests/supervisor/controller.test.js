@@ -42,6 +42,30 @@ test('restart delegates to the service manager and waits for HTTP readiness', as
   assert.deepEqual(calls[0].slice(0, 2), ['/usr/bin/systemctl', ['restart', 'example.service']]);
   assert.equal(calls[1], 'ready'); assert.equal(c.operation.phase, 'done');
 });
+
+test('macOS restart unloads gracefully and bootstraps only its configured LaunchAgent', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push([command, args]); return { stdout: '' }; });
+  Object.assign(c.config, { backend: 'launchd', domain: 'gui/501', service: 'net.example.harness', plist: '/Users/example/Library/LaunchAgents/net.example.harness.plist' });
+  c.waitReady = async () => calls.push('ready');
+  await c.accept('restart'); await c.run();
+  assert.deepEqual(calls, [
+    ['/bin/launchctl', ['bootout', '--wait', 'gui/501/net.example.harness']],
+    ['/bin/launchctl', ['bootstrap', 'gui/501', c.config.plist]], 'ready',
+  ]);
+  assert.equal(c.operation.phase, 'done');
+});
+
+test('macOS source builds retain power controls without querying or replacing the checkout', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push([command, args]); return { stdout: '' }; }, async () => { throw Error('Registry must not run for source builds'); });
+  Object.assign(c.config, { backend: 'launchd', domain: 'gui/501', service: 'net.example.harness', sourceManifest: path.join(c.config.installRoot, 'node_modules/@deepseek-ai/dsh/package.json') });
+  assert.equal((await c.status()).updateSupported, false);
+  await assert.rejects(c.accept('update', '0.2.1'), /source workflow/);
+  await c.accept('shutdown'); await c.run();
+  assert.deepEqual(calls, [['/bin/launchctl', ['bootout', '--wait', 'gui/501/net.example.harness']]]);
+  assert.equal(c.operation.phase, 'done');
+});
 test('shutdown stops only Harness, and never shuts down the OS or launches a helper', async t => {
   const calls = [];
   const c = await fixture(t, async (...args) => { calls.push(args); return { stdout: '' }; });
@@ -71,4 +95,47 @@ test('failed update readiness restores the prior install and starts it again', a
   assert.equal(await c.installedVersion(), '0.2.1-rc.5');
   assert.deepEqual(calls.filter(([cmd]) => cmd.endsWith('/systemctl')).map(([, args]) => args[0]), ['stop', 'start', 'stop', 'start']);
   assert.equal(checks, 2);
+});
+
+test('macOS npm updates stage as the desktop user and switch only the configured install', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => {
+    calls.push([command, args]);
+    if (args.includes('install')) {
+      const stage = args[args.indexOf('--prefix') + 1];
+      await mkdir(path.join(stage, 'node_modules/@deepseek-ai/dsh'), { recursive: true });
+      await writeFile(path.join(stage, 'node_modules/@deepseek-ai/dsh/package.json'), '{"version":"0.2.1"}');
+    }
+    return { stdout: '0.2.1' };
+  }, async () => '0.2.1');
+  Object.assign(c.config, { backend: 'launchd', domain: 'gui/501', service: 'net.example.harness', plist: '/Users/example/service.plist', node: '/node', npm: '/npm', home: os.tmpdir() });
+  c.waitReady = async () => {};
+  await c.accept('update', '0.2.1');await c.run();
+  assert.equal(c.operation.phase, 'done');
+  assert.equal(await c.installedVersion(), '0.2.1');
+  assert.equal(calls[0][0], '/npm');
+  assert.deepEqual(calls[1][1].slice(-1), ['--version']);
+  assert.deepEqual(calls.filter(([cmd]) => cmd === '/bin/launchctl').map(([, args]) => args[0]), ['bootout', 'bootstrap']);
+  assert.equal(calls.some(([cmd]) => cmd.includes('runuser') || cmd.includes('systemctl')), false);
+});
+
+test('macOS restores the old npm installation when the replacement job cannot bootstrap', async t => {
+  let starts = 0, stops = 0;
+  const c = await fixture(t, async (command, args) => {
+    if (args.includes('install')) {
+      const stage = args[args.indexOf('--prefix') + 1];
+      await mkdir(path.join(stage, 'node_modules/@deepseek-ai/dsh'), { recursive: true });
+      await writeFile(path.join(stage, 'node_modules/@deepseek-ai/dsh/package.json'), '{"version":"0.2.1"}');
+    }
+    if (command === '/bin/launchctl' && args[0] === 'bootstrap' && ++starts === 1) throw new Error('new launch target rejected');
+    if (command === '/bin/launchctl' && args[0] === 'bootout' && ++stops === 2) throw Object.assign(new Error('job not loaded'), { code: 113 });
+    return { stdout: '0.2.1' };
+  }, async () => '0.2.1');
+  Object.assign(c.config, { backend: 'launchd', domain: 'gui/501', service: 'net.example.harness', plist: '/Users/example/service.plist', node: '/node', npm: '/npm', home: os.tmpdir() });
+  c.waitReady = async () => {};
+  await c.accept('update', '0.2.1');await c.run();
+  assert.equal(c.operation.phase, 'failed');
+  assert.match(c.operation.error, /previous install restored/);
+  assert.equal(await c.installedVersion(), '0.2.1-rc.5');
+  assert.equal(starts, 2);
 });

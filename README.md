@@ -19,7 +19,7 @@
 
 ## 安装
 
-需要 Node.js **≥ 22.18** 和 DSH Web。当前验证版本为 **DSH 0.2.1-rc.5**；电源操作还需要 Linux、systemd 和本仓库提供的电源控制服务。
+需要 Node.js **≥ 22.18** 和 DSH Web。电源操作需要安装本仓库提供的独立控制服务：Linux 使用 systemd，macOS 使用当前用户的 launchd。macOS 支持源码构建的重启和停止；自动更新适用于 npm 管理的 Harness 安装。
 
 ```bash
 dsh plugin --profile web add dsh-lifecycle
@@ -27,7 +27,7 @@ dsh plugin --profile web add dsh-lifecycle
 
 请使用运行 Harness 的账户，以及相同的 HOME / DSH_HOME 安装。
 
-安装后按[部署说明](docs/DEPLOYMENT.md)配置 HTTPS，并安装本仓库提供的电源控制服务，再重启 Harness。
+安装后按[部署说明](docs/DEPLOYMENT.md)安装对应平台的电源控制服务，再重启 Harness；公网部署还需配置 HTTPS。
 
 ## 使用
 

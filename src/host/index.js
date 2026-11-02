@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { authorizedAction, trustedTransport } from './security.js';
 import { json, readJson } from '../utils/http.js';
+import { powerPaths } from '../utils/power-paths.js';
 
 export const name = 'dsh-lifecycle-power';
 export const inject = ['webServer'];
@@ -10,7 +11,7 @@ const BASE = '/api/dsh-lifecycle/power';
 /** Forward a fixed operation to the independently managed Unix socket service. */
 export function controlRequest(method, path, body) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ socketPath: process.env.DSH_LIFECYCLE_SOCKET || '/run/dsh-lifecycle/control.sock', path, method,
+    const req = http.request({ socketPath: process.env.DSH_LIFECYCLE_SOCKET || powerPaths().socket, path, method,
       headers: { 'Content-Type': 'application/json' }, timeout: 12000 }, async res => {
       try {
         const data = await readJson(res);

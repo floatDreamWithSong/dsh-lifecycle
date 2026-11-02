@@ -21,7 +21,10 @@ async function status(refreshToken) {
   const options = { cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000) };
   if (refreshToken) Object.assign(options, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-DSH-Power-Token': refreshToken }, body: '{}' });
   const res = await fetch(BASE + (refreshToken ? '/refresh' : '/status'), options);
-  if (!res.ok) throw new Error(`状态检查失败（${res.status}）`);
+  if (!res.ok) {
+    const detail = await res.json();
+    throw new Error(detail.error?.includes('ENOENT') ? '未安装电源控制服务，请按部署说明配置。' : detail.error || `状态检查失败（${res.status}）`);
+  }
   return res.json();
 }
 
@@ -116,7 +119,7 @@ export function PowerMenu({ wide = true, openSecurity }) {
         setOpen(!open);
       }}><PowerIcon/>{wide && <span>电源</span>}</button>
     {open && createPortal(<div ref={menu} id="dpm-menu" className="dpm-menu" role="menu" tabIndex={-1} aria-label="电源选项" style={position} onKeyDown={keyMenu}>
-      <div className="dpm-caption">DEEPSEEK HARNESS <span className="dpm-version"><span>{info?.current || '正在检查版本…'}</span>
+      <div className="dpm-caption">DEEPSEEK HARNESS <span className="dpm-version"><span>{info?.current || (refreshing ? '正在检查版本…' : '版本不可用')}</span>
         <button type="button" className={'dpm-refresh' + (refreshing ? ' is-refreshing' : '')} aria-label="刷新检测" title="重新检测更新" disabled={refreshing} aria-busy={refreshing} onClick={() => { void loadInfo(true); }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.1 6.1a8 8 0 0 1 13.1 2.2M4.8 15.7a8 8 0 0 0 13.1 2.2" strokeLinecap="round"/></svg>
         </button></span></div>
@@ -124,7 +127,7 @@ export function PowerMenu({ wide = true, openSecurity }) {
       {info?.update && <button role="menuitem" onClick={() => { close(); void begin('update', info.update); }}><span>↓</span><div>更新并重启<small>{info.current} → {info.update}</small></div><i className="dpm-dot"/></button>}
       <button role="menuitem" onClick={() => { close(); void lock(); }}><span>⌑</span><div>锁定<small>保留服务，锁定当前浏览器</small></div></button><button role="menuitem" onClick={() => { close(); openSecurity(); }}><span>⚙</span><div>登录与安全<small>验证方式、锁屏壁纸与会话管理</small></div></button><div className="dpm-divider"/>
       <button className="dpm-danger" role="menuitem" onClick={() => { close(); setConfirm(true); }}><PowerIcon/><div>关机<small>停止 Harness 服务</small></div></button>
-      {(error || info?.checkError) && <p className="dpm-warning" role="status">{error || '版本检查失败：' + info.checkError}</p>}
+      {(error || info?.checkError || info?.updateReason) && <p className="dpm-warning" role="status">{error || (info?.checkError ? '版本检查失败：' + info.checkError : info.updateReason)}</p>}
     </div>, document.body)}
     {confirm && createPortal(<div className="dpm-mask" onClick={e => { if (e.target === e.currentTarget) setConfirm(false); }}>
       <section ref={dialog} className="dpm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="dpm-confirm-title" aria-describedby="dpm-confirm-body"

@@ -3,6 +3,18 @@ import { test, expect } from '@playwright/test';
 import { generateTOTP } from '../../lib/totp.js';
 const password = 'Preview-Admin-123!';
 
+test('source-managed power menu shows its version and update policy without disabling restart', async ({ page, request }) => {
+  await reset(request);await login(page);
+  await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {
+    current: '0.2.2-alpha.2', update: null, updateSupported: false, updateReason: '源码构建：请通过源码工作流更新',
+  } }));
+  await page.getByRole('button', { name: '电源', exact: true }).click();
+  await expect(page.getByText('0.2.2-alpha.2', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('源码构建：请通过源码工作流更新');
+  await expect(page.getByRole('menuitem', { name: /重新启动/ })).toBeEnabled();
+  await expect(page.getByRole('menuitem', { name: /更新并重启/ })).toHaveCount(0);
+});
+
 test('waking the lock screen does not add transient document overflow', async ({ page, request }) => {
   await reset(request);
   await page.goto('/login');
