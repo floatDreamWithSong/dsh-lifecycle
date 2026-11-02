@@ -7,6 +7,16 @@
 - 侧边栏「电源」菜单：锁定、重启、关机，以及检测到新版时的更新并重启。
 - DSH 内的「登录与安全」页面，分区管理密码、验证方式、壁纸和登录会话。
 
+## 界面预览
+
+以下为本地演示环境的实际界面，未包含生产账户或会话信息。
+
+![锁屏界面](assets/screenshots/lock-screen.png)
+
+![登录与安全](assets/screenshots/security-settings.png)
+
+更多截图见 [screenshots.json](screenshots.json)，供插件市场展示。
+
 ## 安装
 
 需要 Node.js **≥ 22.18** 和 DSH Web。当前验证版本为 **DSH 0.2.1-rc.5**；电源操作还需要 Linux、systemd 和本仓库提供的电源控制服务。
