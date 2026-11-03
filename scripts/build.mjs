@@ -4,6 +4,8 @@ await mkdir('dist', { recursive: true });
 await build({ entryPoints: ['src/host/index.js'], bundle: true, platform: 'node', format: 'esm', outfile: 'dist/host.js', target: 'node22' });
 await build({ entryPoints: ['src/supervisor/index.js'], bundle: true, platform: 'node', format: 'esm', outfile: 'dist/supervisor.js', target: 'node22' });
 await build({ entryPoints: ['src/supervisor/launchd.js'], bundle: true, platform: 'node', format: 'esm', outfile: 'dist/launchd.js', target: 'node22' });
+await build({ entryPoints: ['src/supervisor/windows.js'], bundle: true, platform: 'node', format: 'esm', outfile: 'dist/windows.js', target: 'node22' });
+await build({ entryPoints: ['src/supervisor/windows-env.js'], bundle: true, platform: 'node', format: 'esm', outfile: 'dist/windows-env.mjs', target: 'node22' });
 await build({ entryPoints: ['src/client/index.jsx'], bundle: true, platform: 'browser', format: 'cjs', outfile: 'dist/client.js', target: 'es2022',
   loader: { '.css': 'text' },
   external: ['react', 'react-dom', 'react/jsx-runtime'],

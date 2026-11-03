@@ -66,6 +66,54 @@ test('macOS source builds retain power controls without querying or replacing th
   assert.deepEqual(calls, [['/bin/launchctl', ['bootout', '--wait', 'gui/501/net.example.harness']]]);
   assert.equal(c.operation.phase, 'done');
 });
+
+test('Windows restarts only its fixed scheduled task and waits for stop and start readiness', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push([command, args]); return { stdout: '' }; });
+  Object.assign(c.config, { backend: 'windows', service: 'DSH-Lifecycle-Example.Harness', taskTool: 'C:\\Windows\\System32\\schtasks.exe' });
+  c.windowsStopped = async () => false;
+  c.waitStopped = async () => calls.push('stopped');
+  c.waitReady = async () => calls.push('ready');
+  await c.accept('restart');await c.run();
+  assert.deepEqual(calls, [
+    [c.config.taskTool, ['/End', '/TN', c.config.service]], 'stopped',
+    [c.config.taskTool, ['/Run', '/TN', c.config.service]], 'ready',
+  ]);
+  assert.equal(c.operation.phase, 'done');
+  const info = await c.status();assert.match(info.platformNotice, /暂未实机验证/);
+});
+
+test('Windows does not start a replacement if stopping the managed task fails', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push(args); throw new Error('Task stop denied'); });
+  Object.assign(c.config, { backend: 'windows', service: 'DSH-Lifecycle-Example.Harness', taskTool: 'C:\\Windows\\System32\\schtasks.exe' });
+  c.windowsStopped = async () => false;
+  await c.accept('restart');await c.run();
+  assert.equal(c.operation.phase, 'failed');
+  assert.equal(calls.length, 1);assert.equal(calls[0][0], '/End');
+});
+
+test('Windows npm updates use node plus npm-cli.js and restore the old tree on startup failure', async t => {
+  const calls = [];
+  let starts = 0;
+  const c = await fixture(t, async (command, args) => {
+    calls.push([command, args]);
+    if (args.includes('install')) {
+      const stage = args[args.indexOf('--prefix') + 1];
+      await mkdir(path.join(stage, 'node_modules/@deepseek-ai/dsh'), { recursive: true });
+      await writeFile(path.join(stage, 'node_modules/@deepseek-ai/dsh/package.json'), '{"version":"0.2.1"}');
+    }
+    if (args[0] === '/Run' && ++starts === 1) throw new Error('new task failed');
+    return { stdout: '0.2.1' };
+  }, async () => '0.2.1');
+  Object.assign(c.config, { backend: 'windows', node: 'C:\\node.exe', npmCli: 'C:\\npm\\npm-cli.js', taskTool: 'C:\\Windows\\System32\\schtasks.exe', service: 'DSH-Lifecycle-Example.Harness', home: os.tmpdir() });
+  c.windowsStopped = async () => false;c.waitStopped = async () => {};c.waitReady = async () => {};
+  await c.accept('update', '0.2.1');await c.run();
+  assert.equal(c.operation.phase, 'failed');assert.match(c.operation.error, /previous install restored/);
+  assert.equal(await c.installedVersion(), '0.2.1-rc.5');
+  assert.equal(calls[0][0], c.config.node);assert.equal(calls[0][1][0], c.config.npmCli);
+  assert.equal(starts, 2);assert.equal(calls.some(([cmd]) => /\.cmd$|runuser|systemctl/.test(cmd)), false);
+});
 test('shutdown stops only Harness, and never shuts down the OS or launches a helper', async t => {
   const calls = [];
   const c = await fixture(t, async (...args) => { calls.push(args); return { stdout: '' }; });

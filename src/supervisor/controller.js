@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { availableUpdate, publishedVersion } from './version.js';
+import { windowsPortsClosed } from './windows.js';
 const exec = promisify(execFile);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -27,9 +28,10 @@ export class Controller {
   /** Cache registry checks for ten minutes; a failed check is explicit and retryable. */
   async status(forceRefresh = false) {
     const current = await this.installedVersion();
+    const platformNotice = this.config.backend === 'windows' ? 'Windows 支持暂未实机验证' : undefined;
     // Source checkouts are owned by the developer; never replace them with an npm release.
     if (this.config.sourceManifest) return { current, update: null, updateSupported: false,
-      updateReason: '源码构建：请通过源码工作流更新', operation: this.operation };
+      updateReason: '源码构建：请通过源码工作流更新', operation: this.operation, platformNotice };
     if (forceRefresh || !this.check || Date.now() - this.check.checkedAt > 600000) {
       this.checking ??= this.getPublished(this.config.channel).then(latest => {
         this.check = { latest, checkedAt: Date.now(), checkError: null };
@@ -39,7 +41,7 @@ export class Controller {
       await this.checking;
     }
     return { current, ...this.check, channel: this.config.channel,
-      update: this.check.latest ? availableUpdate(current, this.check.latest) : null, operation: this.operation };
+      update: this.check.latest ? availableUpdate(current, this.check.latest) : null, operation: this.operation, platformNotice };
   }
 
   /** Claim an operation before returning HTTP 202; duplicate requests cannot race. */
@@ -81,6 +83,17 @@ export class Controller {
 
   /** Control the single configured service through its owning OS manager, without a shell. */
   async service(verb) {
+    if (!['start', 'stop', 'restart'].includes(verb)) throw new Error('Unknown service operation');
+    if (this.config.backend === 'windows') {
+      if (verb === 'restart') { await this.service('stop'); return this.service('start'); }
+      if (verb === 'stop') {
+        if (await this.windowsStopped()) return;
+        await this.execute(this.config.taskTool, ['/End', '/TN', this.config.service], { timeout: 90000 });
+        await this.waitStopped();
+        return;
+      }
+      return this.execute(this.config.taskTool, ['/Run', '/TN', this.config.service], { timeout: 90000 });
+    }
     if (this.config.backend === 'launchd') {
       const { domain, service, plist } = this.config;
       // Unload gracefully before starting: kickstart -k can terminate before DSH flushes state.
@@ -89,6 +102,20 @@ export class Controller {
       return this.execute('/bin/launchctl', args, { timeout: 90000 });
     }
     return this.execute('/usr/bin/systemctl', [verb, this.config.service], { timeout: 90000 });
+  }
+
+  /** Inspect listener shutdown independently of localized Task Scheduler status strings. */
+  windowsStopped() {
+    return windowsPortsClosed(this.config.healthUrl);
+  }
+
+  /** Do not race a Windows task stop with a replacement process binding the same ports. */
+  async waitStopped() {
+    for (let i = 0; i < 60; i++) {
+      if (await this.windowsStopped()) return;
+      await pause(1000);
+    }
+    throw new Error('Harness did not release its Windows listener ports within 60 seconds');
   }
 
   /** Wait for an HTTP listener after the OS manager starts the service. */
@@ -112,7 +139,10 @@ export class Controller {
     const backup = c.installRoot + '.backup-' + op.id;
     op.phase = 'downloading';
     await mkdir(stage, { mode: 0o755 });
-    if (c.backend === 'launchd') {
+    if (c.backend === 'windows') {
+      await this.execute(c.node, [c.npmCli, 'install', '--prefix', stage, '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund', '@deepseek-ai/dsh@' + op.target],
+        { timeout: 600000, maxBuffer: 8 * 1024 * 1024, cwd: stage, env: { ...process.env, HOME: c.home } });
+    } else if (c.backend === 'launchd') {
       await this.execute(c.npm, ['install', '--prefix', stage, '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund', '@deepseek-ai/dsh@' + op.target],
         { timeout: 600000, maxBuffer: 8 * 1024 * 1024, cwd: stage, env: { ...process.env, HOME: c.home } });
     } else {
@@ -126,7 +156,7 @@ export class Controller {
     }
     op.phase = 'validating';
     const cli = path.join(stage, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
-    const result = c.backend === 'launchd'
+    const result = ['launchd', 'windows'].includes(c.backend)
       ? await this.execute(c.node, [cli, '--version'], { timeout: 30000, cwd: c.home })
       : await this.execute('/usr/sbin/runuser', ['-u', c.user, '--', c.node, cli, '--version'], { timeout: 30000, cwd: c.home });
     if (result.stdout.trim() !== op.target) throw new Error('Staged CLI version does not match the requested release');

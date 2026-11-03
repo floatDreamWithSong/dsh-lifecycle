@@ -3,6 +3,16 @@ import { test, expect } from '@playwright/test';
 import { generateTOTP } from '../../lib/totp.js';
 const password = 'Preview-Admin-123!';
 
+test('Windows power menu visibly marks hardware validation as pending', async ({ page, request }) => {
+  await reset(request);await login(page);
+  await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {
+    current: '0.2.1-rc.5', update: null, platformNotice: 'Windows 支持暂未实机验证',
+  } }));
+  await page.getByRole('button', { name: '电源', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Windows 支持暂未实机验证');
+  await expect(page.getByRole('menuitem', { name: /重新启动/ })).toHaveText(/停止并重新启动托管进程/);
+});
+
 test('source-managed power menu shows its version and update policy without disabling restart', async ({ page, request }) => {
   await reset(request);await login(page);
   await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {

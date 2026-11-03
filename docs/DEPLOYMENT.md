@@ -99,6 +99,42 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/net.deepseek.dsh-
 
 升级插件不会自动替换已复制的独立控制程序。升级控制程序或修改启动参数时，先按下面的卸载步骤停用两个 LaunchAgent，备份并移走原来的配置目录，再运行安装器；保留认证数据目录。
 
+## Windows 电源服务（实验支持，暂未实机验证）
+
+提供了 Windows 10/11 任务计划程序的安装器与控制逻辑。当前仅验证了跨平台单元测试、模拟命令调用和界面提示，**没有在 Windows 实机注册任务、连接命名管道或执行重启／更新**；暂不视为 Windows 已验证支持。
+
+安装器为当前登录用户注册两个任务，分别运行 Harness 和独立控制服务。任务使用当前用户的交互式登录权限，不保存 Windows 密码、不要求提升到管理员；组织策略若拒绝注册任务，安装器会直接报错。退出该 Windows 用户后，服务不可继续保证运行。
+
+先停止原来的 DSH，再在普通 PowerShell 中操作。源码构建示例，在 Harness 仓库根目录执行：
+
+```powershell
+$node = (Get-Command node.exe).Source
+$plugin = Join-Path $HOME '.dsh\profiles\web\node_modules\dsh-lifecycle'
+& $node "$plugin\scripts\install-windows.mjs" `
+  --cwd "$PWD" `
+  --source-manifest "$PWD\package.json" `
+  --node "$node" `
+  -- "$node" --import tsx/esm apps/cli/src/bin.ts web --no-open
+```
+
+安装器要求直接启动 `node.exe`，不接受 `pnpm.cmd`、`npm.cmd` 或 PowerShell 包装启动命令。需要自定义端口时，同时修改安装器的 `--port` 和 CLI 的 `--port`；使用自定义 `DSH_HOME` 时，在运行安装器前设置 `$env:DSH_HOME`。
+
+npm 管理的独立安装用 `--install-root 'C:\DSH\harness' --npm-cli 'C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js'` 替代 `--source-manifest`，并让启动命令指向该安装目录内的 CLI。以上路径需要按本机实际安装替换。更新通过 Node 调用 `npm-cli.js`，不经过 `cmd.exe`；不要使用全局共享 npm 前缀作为安装目录。
+
+控制文件与控制台日志位于 `%LOCALAPPDATA%\dsh-lifecycle\`。安装器先将目录 ACL 限制为当前用户，再写入配置；控制链路使用随机命名管道与独立令牌。`config.json` 含本地控制凭据，不要上传或粘贴到公开场合。认证数据仍使用原来的 `DSH_HOME`。
+
+电源面板会显示「Windows 支持暂未实机验证」。关机只结束 Harness 对应的任务，不关闭 Windows。停止路径使用任务计划程序结束进程，**不能承诺等同于 Unix 的优雅退出**；会话恢复、子进程清理、端口释放和 npm 更新回滚都需要 Windows 实机验证。源码构建不会自动更新或覆盖仓库。
+
+```powershell
+# 查看启动日志和初始密码；不要公开日志内容
+Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\harness.log" -Tail 60 -Encoding utf8
+# 页面关机后手动启动
+$config = Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\config.json" -Raw -Encoding utf8 | ConvertFrom-Json
+schtasks.exe /Run /TN $config.service
+```
+
+升级独立控制程序前，先按卸载步骤停用两个任务并备份控制目录，再运行新安装器。安装器不会覆盖同名任务或现有配置。
+
 ## 数据和登录恢复
 
 | `$DSH_HOME` 下的路径 | 内容 |
@@ -145,4 +181,14 @@ macOS 先执行以下命令停用托管服务；如果已从页面关机，第�
 ```bash
 launchctl bootout --wait "gui/$(id -u)/net.deepseek.dsh-lifecycle.harness"
 launchctl bootout --wait "gui/$(id -u)/net.deepseek.dsh-lifecycle"
+```
+
+Windows 在普通 PowerShell 中读取自己安装的任务名，依次结束并删除这两个任务。已停止的任务可能提示没有运行实例。备份并移走控制目录即可保留诊断资料；不删除认证数据目录。
+
+```powershell
+$config = Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\config.json" -Raw -Encoding utf8 | ConvertFrom-Json
+schtasks.exe /End /TN $config.service
+schtasks.exe /End /TN $config.controllerTask
+schtasks.exe /Delete /TN $config.service /F
+schtasks.exe /Delete /TN $config.controllerTask /F
 ```

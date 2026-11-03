@@ -4,11 +4,21 @@ import { Controller } from './controller.js';
 import { json, readJson } from '../utils/http.js';
 import { powerPaths } from '../utils/power-paths.js';
 import { prepareSocket } from '../utils/unix-socket.js';
+import { windowsControlTarget, authorizedWindowsControl } from '../utils/windows-control.js';
+import { windowsSystemTool } from './windows.js';
+import { createWriteStream } from 'node:fs';
+import { Console } from 'node:console';
 
 const config = JSON.parse(await readFile(process.env.DSH_LIFECYCLE_CONFIG || powerPaths().config, 'utf8'));
 if (config.backend === 'launchd') {
   if (process.platform !== 'darwin' || config.domain !== 'gui/' + process.getuid()
     || !/^[a-zA-Z0-9_.-]+$/.test(config.service) || !config.plist?.startsWith('/')) throw new Error('Invalid per-user launchd target');
+} else if (config.backend === 'windows') {
+  if (process.platform !== 'win32' || !/^[a-zA-Z0-9_.-]+$/.test(config.service)
+    || config.taskTool?.toLowerCase() !== windowsSystemTool('schtasks.exe').toLowerCase()) throw new Error('Invalid Windows scheduled task');
+  windowsControlTarget(config);
+  const log = createWriteStream(config.controllerLog, { flags: 'a' });
+  globalThis.console = new Console({ stdout: log, stderr: log });
 } else if (config.backend && config.backend !== 'systemd') throw new Error('Unsupported power backend');
 else if (!/^[a-zA-Z0-9_.@-]+\.service$/.test(config.service)) throw new Error('Invalid systemd unit');
 if (!['latest', 'next', 'alpha'].includes(config.channel)) throw new Error('Invalid release channel');
@@ -16,6 +26,7 @@ if (!config.healthUrl.startsWith('http://127.0.0.1:')) throw new Error('Health U
 const control = new Controller(config);
 const server = http.createServer(async (req, res) => {
   try {
+    if (config.backend === 'windows' && !authorizedWindowsControl(req.headers['x-dsh-controller-token'], config.controlToken)) return json(res, 403, { error: 'Invalid controller credential' });
     if (req.url === '/health' && req.method === 'GET') return json(res, 200, { operation: control.operation });
     if (req.url === '/status' && req.method === 'GET') return json(res, 200, await control.status());
     if (req.url === '/refresh' && req.method === 'POST') return json(res, 200, await control.status(true));
@@ -31,8 +42,8 @@ const server = http.createServer(async (req, res) => {
     json(res, 409, { error: error.message });
   }
 });
-await prepareSocket(config.socket);
+if (config.backend !== 'windows') await prepareSocket(config.socket);
 server.listen(config.socket, async () => {
-  await chmod(config.socket, config.backend === 'launchd' ? 0o600 : 0o660);
+  if (config.backend !== 'windows') await chmod(config.socket, config.backend === 'launchd' ? 0o600 : 0o660);
   console.log('Power supervisor listening on', config.socket);
 });

@@ -17,7 +17,7 @@
 
 ## 安装
 
-需要 Node.js **≥ 22.18** 和 DSH Web。电源操作需要安装本仓库提供的独立控制服务：Linux 使用 systemd，macOS 使用当前用户的 launchd。macOS 支持源码构建的重启和停止；自动更新适用于 npm 管理的 Harness 安装。
+需要 Node.js **≥ 22.18** 和 DSH Web。电源操作需要安装本仓库提供的独立控制服务：Linux 使用 systemd，macOS 使用 launchd，Windows 使用当前用户的任务计划程序。**Windows 支持为实验实现，暂未实机验证**，请先在测试环境确认。源码构建支持重启和停止；自动更新适用于 npm 管理的 Harness 安装。
 
 ```bash
 dsh plugin --profile web add dsh-lifecycle

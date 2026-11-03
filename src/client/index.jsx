@@ -10,7 +10,7 @@ let snapshot = { action: null, phase: '', error: null };
 const listeners = new Set();
 const titles = { restart: '正在重新启动', shutdown: '正在关闭 DeepSeek Harness', update: '正在更新 DeepSeek Harness' };
 const phases = { accepted: '正在准备，请稍候', downloading: '正在下载并安装新版本，服务仍可使用', validating: '正在检查新版本',
-  restarting: '正在重新启动服务', stopping: '正在保存会话并停止服务', 'rolling-back': '更新未成功，正在恢复原版本' };
+  restarting: '正在重新启动服务', stopping: '正在停止 Harness 服务', 'rolling-back': '更新未成功，正在恢复原版本' };
 
 function publish(value) {
   snapshot = { ...snapshot, ...value };
@@ -123,11 +123,12 @@ export function PowerMenu({ wide = true, openSecurity }) {
         <button type="button" className={'dpm-refresh' + (refreshing ? ' is-refreshing' : '')} aria-label="刷新检测" title="重新检测更新" disabled={refreshing} aria-busy={refreshing} onClick={() => { void loadInfo(true); }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.1 6.1a8 8 0 0 1 13.1 2.2M4.8 15.7a8 8 0 0 0 13.1 2.2" strokeLinecap="round"/></svg>
         </button></span></div>
-      <button role="menuitem" onClick={() => { close(); void begin('restart'); }}><span>↻</span><div>重新启动<small>保存会话，重新加载服务</small></div></button>
+      <button role="menuitem" onClick={() => { close(); void begin('restart'); }}><span>↻</span><div>重新启动<small>{info?.platformNotice ? '停止并重新启动托管进程' : '保存会话，重新加载服务'}</small></div></button>
       {info?.update && <button role="menuitem" onClick={() => { close(); void begin('update', info.update); }}><span>↓</span><div>更新并重启<small>{info.current} → {info.update}</small></div><i className="dpm-dot"/></button>}
       <button role="menuitem" onClick={() => { close(); void lock(); }}><span>⌑</span><div>锁定<small>保留服务，锁定当前浏览器</small></div></button><button role="menuitem" onClick={() => { close(); openSecurity(); }}><span>⚙</span><div>登录与安全<small>验证方式、锁屏壁纸与会话管理</small></div></button><div className="dpm-divider"/>
       <button className="dpm-danger" role="menuitem" onClick={() => { close(); setConfirm(true); }}><PowerIcon/><div>关机<small>停止 Harness 服务</small></div></button>
       {(error || info?.checkError || info?.updateReason) && <p className="dpm-warning" role="status">{error || (info?.checkError ? '版本检查失败：' + info.checkError : info.updateReason)}</p>}
+      {info?.platformNotice && <p className="dpm-warning" role="status">{info.platformNotice}</p>}
     </div>, document.body)}
     {confirm && createPortal(<div className="dpm-mask" onClick={e => { if (e.target === e.currentTarget) setConfirm(false); }}>
       <section ref={dialog} className="dpm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="dpm-confirm-title" aria-describedby="dpm-confirm-body"
