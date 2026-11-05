@@ -3,6 +3,30 @@ import { test, expect } from '@playwright/test';
 import { generateTOTP } from '../../lib/totp.js';
 const password = 'Preview-Admin-123!';
 
+test('missing Windows power control can be enabled in the page with an explicit restart confirmation', async ({ page, request }) => {
+  await reset(request);await login(page);
+  await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {
+    installed: false, setupAvailable: true, setupReason: '启用后会自动配置当前用户的后台服务，并重新启动一次。',
+  } }));
+  await page.route('**/api/dsh-lifecycle/power/setup', async route => {
+    expect(route.request().postDataJSON()).toEqual({ action: 'setup', confirm: 'enable-and-restart' });
+    await route.fulfill({ status: 503, json: { error: '组织策略拒绝注册任务，原服务仍在运行。' } });
+  });
+  await page.getByRole('button', { name: '电源', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: /重新启动/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /关机/ })).toBeDisabled();
+  await page.getByRole('menuitem', { name: /启用电源控制/ }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toContainText('登录 Windows 后会自动启动');
+  await page.setViewportSize({ width: 390, height: 740 });
+  await expect(dialog.getByRole('button', { name: '启用并重启' })).toBeInViewport();
+  await page.screenshot({ path: 'test-results/windows-enable-mobile.png', animations: 'disabled' });
+  await dialog.getByRole('button', { name: '启用并重启' }).click();
+  await expect(page.getByRole('status')).toHaveText('组织策略拒绝注册任务，原服务仍在运行。');
+  await page.getByRole('button', { name: '返回页面' }).click();
+  await expect(page.getByTestId('conversation-content')).toBeVisible();
+});
+
 test('Windows power menu warns that stopping the process tree interrupts active tasks', async ({ page, request }) => {
   await reset(request);await login(page);
   await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {

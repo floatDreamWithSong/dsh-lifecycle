@@ -1,5 +1,25 @@
 # Windows 实测记录
 
+## 0.1.10 页面启用复测
+
+2026-11-05 在 Windows 11、Node.js 24.16.0 上，分别使用真实源码 Harness `fcc0ad4621` 和 npm Harness `0.2.2-rc.1`，从未安装控制服务的普通 Web CLI 开始验证：
+
+- 页面缺少服务时显示「启用电源控制」，重启和关机不可误点；二次确认说明任务中断及登录 Windows 后自动启动。
+- 页面点击「启用并重启」，真实注册当前用户的两个任务；控制目录含中文与空格。原交互式 CLI 自行退出，后台实例接管，原登录仍有效。
+- 停止独立控制任务后，页面重新启用成功，仅恢复控制服务，不重启仍运行的 Harness。
+- 接管后从真实页面执行重启及关机；重启成功更换实例，关机释放两个监听端口。测试结束后清理自己注册的任务。
+- 未带 CSRF 的启用请求返回 403；公开操作接口不能直接调用内部 `takeover`。安装失败不请求原 CLI 退出；原 CLI 未退出时不启动竞争实例。
+
+验证命令：`DSH_LIFECYCLE_HARNESS_ROOT` 指向独立源码 Harness 仓库，先运行 `npm pack`，再执行 `npm run test:windows-setup`；Chrome 路径通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定。该测试自动创建隔离的 `DSH_HOME`，初始化凭据在独立子进程中完成，不修改测试进程的全局数据目录。
+
+npm 实例复测时，`DSH_LIFECYCLE_HARNESS_ROOT` 改指独立 npm 前缀，并设置 `DSH_LIFECYCLE_HARNESS_CLI` 为该前缀内 `node_modules/@deepseek-ai/dsh/lib/bin.js` 的绝对路径，执行同一测试。
+
+插件单元测试 114 通过、2 个 Unix 专属测试跳过；12 个浏览器测试通过，新增启用确认、移动端布局及安装失败后可返回页面的覆盖。
+
+**首次安装后的旧页面提示仍有边界：** 如果旧页面已经被新网关的 401 拦住、无法加载插件客户端，插件不能在那一页弹窗。未修改 Harness；README、npm 简介和市场条目均前置要求立即手动刷新或打开 `/login`。已加载插件客户端的页面保留醒目提示。
+
+## 0.1.7 历史验证
+
 验证日期：2026-11-05。验证对象为 dsh-lifecycle 0.1.7，使用 Windows 11 x64、Node.js 24.16.0、Windows 自带的任务计划程序及 Windows PowerShell。浏览器自动化使用本机 Chrome，无需真实模型 API Key。
 
 ## 实际 Harness 验证

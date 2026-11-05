@@ -1,5 +1,11 @@
 # DSH Lifecycle · DeepSeek 生命周期管理
 
+> **安装完成后，请立即刷新当前页面，或打开 `/login`。**
+>
+> **旧页面显示「无法连接」或 HTTP 401，不代表插件安装失败。** 登录验证已经启用，旧页面尚未登录，而且可能连插件的弹窗代码也加载不到。此时必须手动刷新，不要反复卸载重装。
+>
+> 随机初始密码直接显示在首次设置页，**终端不会打印密码**；验证后必须改成自己的密码。Windows 用户登录后可在 **「电源 → 启用电源控制 → 启用并重启」** 自动配置后台服务，无需打开终端。
+
 为单用户 DeepSeek Harness 提供锁屏、登录验证和服务电源管理。
 
 - Windows 风格锁屏与首次设置引导，支持自定义壁纸。
@@ -19,7 +25,7 @@
 
 **安装完成后必须刷新当前页面，进入登录或首次设置。** 旧页面显示「无法连接」或接口返回 **HTTP 401**，通常表示新登录验证已生效、当前浏览器尚未登录，并不代表插件安装失败。请刷新页面或访问 `/login`，不要因此反复卸载重装。
 
-需要 Node.js **≥ 22.18** 和 DSH Web，同时满足 Harness 自身更高的 Node 版本要求。电源操作需要安装本仓库提供的独立控制服务：Linux 使用 systemd，macOS 使用 launchd，Windows 使用当前用户的任务计划程序。Windows 11 已完成真实 Harness 登录、锁屏、重启、停止、npm 更新及故障回滚实测，验证范围见 [Windows 验证记录](docs/WINDOWS-VALIDATION.md)。源码构建支持重启和停止；自动更新适用于 npm 管理的 Harness 安装。
+需要 Node.js **≥ 22.18** 和 DSH Web，同时满足 Harness 自身更高的 Node 版本要求。电源操作依赖独立控制服务：Linux 使用 systemd，macOS 使用 launchd；Windows 可直接在页面一键安装当前用户的计划任务。Windows 11 已完成真实 Harness 页面启用、登录、锁屏、重启、停止、独立 npm 更新及故障回滚实测，验证范围见 [Windows 验证记录](docs/WINDOWS-VALIDATION.md)。源码及全局共享安装支持重启和停止，但不自动替换源码或共享包目录；自动更新仅适用于按部署说明配置的独立 npm 安装。
 
 ```bash
 dsh plugin --profile web add dsh-lifecycle
@@ -31,7 +37,7 @@ dsh plugin --profile web add dsh-lifecycle
 
 请使用运行 Harness 的账户，以及相同的 HOME / DSH_HOME 安装。
 
-安装后按[部署说明](docs/DEPLOYMENT.md)安装对应平台的电源控制服务，再重启 Harness；公网部署还需配置 HTTPS。
+Windows 首次登录后点击 **「电源 → 启用电源控制 → 启用并重启」**，插件会识别当前启动命令、端口和数据目录，安装当前用户的后台任务，然后自动恢复页面。启用会中断正在运行的任务；后续登录 Windows 时自动启动 Harness。Linux/macOS 及自定义 Windows 部署见[部署说明](docs/DEPLOYMENT.md)；公网部署还需配置 HTTPS。
 
 ## 使用
 

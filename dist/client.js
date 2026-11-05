@@ -646,13 +646,14 @@ var inject = ["slots", "layout"];
 var BASE = "/api/dsh-lifecycle/power";
 var snapshot = { action: null, phase: "", error: null };
 var listeners = /* @__PURE__ */ new Set();
-var titles = { restart: "\u6B63\u5728\u91CD\u65B0\u542F\u52A8", shutdown: "\u6B63\u5728\u5173\u95ED DeepSeek Harness", update: "\u6B63\u5728\u66F4\u65B0 DeepSeek Harness" };
+var titles = { setup: "\u6B63\u5728\u542F\u7528\u7535\u6E90\u63A7\u5236", restart: "\u6B63\u5728\u91CD\u65B0\u542F\u52A8", shutdown: "\u6B63\u5728\u5173\u95ED DeepSeek Harness", update: "\u6B63\u5728\u66F4\u65B0 DeepSeek Harness" };
 var phases = {
   accepted: "\u6B63\u5728\u51C6\u5907\uFF0C\u8BF7\u7A0D\u5019",
   downloading: "\u6B63\u5728\u4E0B\u8F7D\u5E76\u5B89\u88C5\u65B0\u7248\u672C\uFF0C\u670D\u52A1\u4ECD\u53EF\u4F7F\u7528",
   validating: "\u6B63\u5728\u68C0\u67E5\u65B0\u7248\u672C",
   restarting: "\u6B63\u5728\u91CD\u65B0\u542F\u52A8\u670D\u52A1",
   stopping: "\u6B63\u5728\u505C\u6B62 Harness \u670D\u52A1",
+  "waiting-for-exit": "\u540E\u53F0\u670D\u52A1\u5DF2\u5C31\u7EEA\uFF0C\u6B63\u5728\u5207\u6362\u6258\u7BA1",
   "rolling-back": "\u66F4\u65B0\u672A\u6210\u529F\uFF0C\u6B63\u5728\u6062\u590D\u539F\u7248\u672C"
 };
 function publish(value) {
@@ -665,7 +666,7 @@ async function status(refreshToken) {
   const res = await fetch(BASE + (refreshToken ? "/refresh" : "/status"), options);
   if (!res.ok) {
     const detail = await res.json();
-    throw new Error(detail.error?.includes("ENOENT") ? "\u672A\u5B89\u88C5\u7535\u6E90\u63A7\u5236\u670D\u52A1\uFF0C\u8BF7\u6309\u90E8\u7F72\u8BF4\u660E\u914D\u7F6E\u3002" : detail.error || `\u72B6\u6001\u68C0\u67E5\u5931\u8D25\uFF08${res.status}\uFF09`);
+    throw new Error(detail.error || `\u72B6\u6001\u68C0\u67E5\u5931\u8D25\uFF08${res.status}\uFF09`);
   }
   return res.json();
 }
@@ -675,15 +676,19 @@ async function session() {
   return res.json();
 }
 async function begin(action, target, confirm) {
-  publish({ action, phase: "accepted", error: null });
+  publish({ action, phase: "accepted", error: null, operationId: null });
   try {
     const before = await session();
-    const res = await fetch(BASE + "/action", { method: "POST", headers: {
+    const res = await fetch(BASE + (action === "setup" ? "/setup" : "/action"), { method: "POST", headers: {
       "Content-Type": "application/json",
       "X-DSH-Power-Token": before.csrf
     }, body: JSON.stringify({ action, target, confirm }) });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error);
+    if (action === "setup" && !result.restartRequired) {
+      window.location.reload();
+      return;
+    }
     publish({ original: before.instanceId, operationId: result.id, startedAt: Date.now() });
   } catch (error) {
     publish({ error: error.message });
@@ -784,7 +789,10 @@ function PowerMenu({ wide = true, openSecurity }) {
     wide && /* @__PURE__ */ import_react.default.createElement("span", null, "\u7535\u6E90")
   ), open && (0, import_react_dom.createPortal)(/* @__PURE__ */ import_react.default.createElement("div", { ref: menu, id: "dpm-menu", className: "dpm-menu", role: "menu", tabIndex: -1, "aria-label": "\u7535\u6E90\u9009\u9879", style: position, onKeyDown: keyMenu }, /* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-caption" }, "DEEPSEEK HARNESS ", /* @__PURE__ */ import_react.default.createElement("span", { className: "dpm-version" }, /* @__PURE__ */ import_react.default.createElement("span", null, info?.current || (refreshing ? "\u6B63\u5728\u68C0\u67E5\u7248\u672C\u2026" : "\u7248\u672C\u4E0D\u53EF\u7528")), /* @__PURE__ */ import_react.default.createElement("button", { type: "button", className: "dpm-refresh" + (refreshing ? " is-refreshing" : ""), "aria-label": "\u5237\u65B0\u68C0\u6D4B", title: "\u91CD\u65B0\u68C0\u6D4B\u66F4\u65B0", disabled: refreshing, "aria-busy": refreshing, onClick: () => {
     void loadInfo(true);
-  } }, /* @__PURE__ */ import_react.default.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("path", { d: "M20 7v5h-5M4 17v-5h5", strokeLinecap: "round", strokeLinejoin: "round" }), /* @__PURE__ */ import_react.default.createElement("path", { d: "M6.1 6.1a8 8 0 0 1 13.1 2.2M4.8 15.7a8 8 0 0 0 13.1 2.2", strokeLinecap: "round" }))))), /* @__PURE__ */ import_react.default.createElement("button", { role: "menuitem", onClick: () => {
+  } }, /* @__PURE__ */ import_react.default.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("path", { d: "M20 7v5h-5M4 17v-5h5", strokeLinecap: "round", strokeLinejoin: "round" }), /* @__PURE__ */ import_react.default.createElement("path", { d: "M6.1 6.1a8 8 0 0 1 13.1 2.2M4.8 15.7a8 8 0 0 0 13.1 2.2", strokeLinecap: "round" }))))), info?.installed === false && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("p", { className: "dpm-warning", role: "status" }, info.setupReason), info.setupAvailable && /* @__PURE__ */ import_react.default.createElement("button", { role: "menuitem", onClick: () => {
+    close();
+    setConfirm("setup");
+  } }, /* @__PURE__ */ import_react.default.createElement(PowerIcon, null), /* @__PURE__ */ import_react.default.createElement("div", null, "\u542F\u7528\u7535\u6E90\u63A7\u5236", /* @__PURE__ */ import_react.default.createElement("small", null, "\u81EA\u52A8\u914D\u7F6E\uFF0C\u65E0\u9700\u6253\u5F00\u7EC8\u7AEF")))), /* @__PURE__ */ import_react.default.createElement("button", { role: "menuitem", disabled: info?.installed === false, onClick: () => {
     close();
     void begin("restart");
   } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u21BB"), /* @__PURE__ */ import_react.default.createElement("div", null, "\u91CD\u65B0\u542F\u52A8", /* @__PURE__ */ import_react.default.createElement("small", null, info?.platformNotice ? "\u505C\u6B62\u5E76\u91CD\u65B0\u542F\u52A8\u6258\u7BA1\u8FDB\u7A0B" : "\u4FDD\u5B58\u4F1A\u8BDD\uFF0C\u91CD\u65B0\u52A0\u8F7D\u670D\u52A1"))), info?.update && /* @__PURE__ */ import_react.default.createElement("button", { role: "menuitem", onClick: () => {
@@ -796,9 +804,9 @@ function PowerMenu({ wide = true, openSecurity }) {
   } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u2311"), /* @__PURE__ */ import_react.default.createElement("div", null, "\u9501\u5B9A", /* @__PURE__ */ import_react.default.createElement("small", null, "\u4FDD\u7559\u670D\u52A1\uFF0C\u9501\u5B9A\u5F53\u524D\u6D4F\u89C8\u5668"))), /* @__PURE__ */ import_react.default.createElement("button", { role: "menuitem", onClick: () => {
     close();
     openSecurity();
-  } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u2699"), /* @__PURE__ */ import_react.default.createElement("div", null, "\u767B\u5F55\u4E0E\u5B89\u5168", /* @__PURE__ */ import_react.default.createElement("small", null, "\u9A8C\u8BC1\u65B9\u5F0F\u3001\u9501\u5C4F\u58C1\u7EB8\u4E0E\u4F1A\u8BDD\u7BA1\u7406"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-divider" }), /* @__PURE__ */ import_react.default.createElement("button", { className: "dpm-danger", role: "menuitem", onClick: () => {
+  } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u2699"), /* @__PURE__ */ import_react.default.createElement("div", null, "\u767B\u5F55\u4E0E\u5B89\u5168", /* @__PURE__ */ import_react.default.createElement("small", null, "\u9A8C\u8BC1\u65B9\u5F0F\u3001\u9501\u5C4F\u58C1\u7EB8\u4E0E\u4F1A\u8BDD\u7BA1\u7406"))), /* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-divider" }), /* @__PURE__ */ import_react.default.createElement("button", { className: "dpm-danger", role: "menuitem", disabled: info?.installed === false, onClick: () => {
     close();
-    setConfirm(true);
+    setConfirm("shutdown");
   } }, /* @__PURE__ */ import_react.default.createElement(PowerIcon, null), /* @__PURE__ */ import_react.default.createElement("div", null, "\u5173\u673A", /* @__PURE__ */ import_react.default.createElement("small", null, "\u505C\u6B62 Harness \u670D\u52A1"))), (error || info?.checkError || info?.updateReason) && /* @__PURE__ */ import_react.default.createElement("p", { className: "dpm-warning", role: "status" }, error || (info?.checkError ? "\u7248\u672C\u68C0\u67E5\u5931\u8D25\uFF1A" + info.checkError : info.updateReason)), info?.platformNotice && /* @__PURE__ */ import_react.default.createElement("p", { className: "dpm-warning", role: "status" }, info.platformNotice)), document.body), confirm && (0, import_react_dom.createPortal)(/* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-mask", onClick: (e) => {
     if (e.target === e.currentTarget) setConfirm(false);
   } }, /* @__PURE__ */ import_react.default.createElement(
@@ -825,16 +833,17 @@ function PowerMenu({ wide = true, openSecurity }) {
       }
     },
     /* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-dialog-icon" }, /* @__PURE__ */ import_react.default.createElement(PowerIcon, null)),
-    /* @__PURE__ */ import_react.default.createElement("h2", { id: "dpm-confirm-title" }, "\u5173\u95ED DeepSeek Harness\uFF1F"),
-    /* @__PURE__ */ import_react.default.createElement("p", { id: "dpm-confirm-body" }, "\u4F1A\u8BDD\u4F1A\u4FDD\u5B58\uFF0C\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5C06\u4E2D\u65AD\u3002\u5173\u95ED\u540E\u7F51\u9875\u65E0\u6CD5\u8BBF\u95EE\uFF0C\u9700\u8981\u5728\u670D\u52A1\u5668\u4E0A\u91CD\u65B0\u542F\u52A8\u670D\u52A1\u3002"),
-    /* @__PURE__ */ import_react.default.createElement("p", { className: "dpm-note" }, "\u53EA\u505C\u6B62 Harness\uFF0C\u4E0D\u5173\u95ED\u670D\u52A1\u5668\u3002"),
+    /* @__PURE__ */ import_react.default.createElement("h2", { id: "dpm-confirm-title" }, confirm === "setup" ? "\u542F\u7528\u7535\u6E90\u63A7\u5236\uFF1F" : "\u5173\u95ED DeepSeek Harness\uFF1F"),
+    /* @__PURE__ */ import_react.default.createElement("p", { id: "dpm-confirm-body" }, confirm === "setup" ? "\u5C06\u81EA\u52A8\u5B89\u88C5\u5F53\u524D Windows \u7528\u6237\u7684\u540E\u53F0\u670D\u52A1\uFF0C\u5E76\u91CD\u65B0\u542F\u52A8 Harness\u3002\u4F1A\u8BDD\u4F1A\u4FDD\u7559\uFF0C\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u4F1A\u4E2D\u65AD\u3002" : "\u4F1A\u8BDD\u4F1A\u4FDD\u5B58\uFF0C\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5C06\u4E2D\u65AD\u3002\u5173\u95ED\u540E\u7F51\u9875\u65E0\u6CD5\u8BBF\u95EE\uFF0C\u9700\u8981\u5728\u670D\u52A1\u5668\u4E0A\u91CD\u65B0\u542F\u52A8\u670D\u52A1\u3002"),
+    /* @__PURE__ */ import_react.default.createElement("p", { className: "dpm-note" }, confirm === "setup" ? "\u767B\u5F55 Windows \u540E\u4F1A\u81EA\u52A8\u542F\u52A8 Harness\u3002\u4F7F\u7528\u5F53\u524D\u7528\u6237\u6743\u9650\uFF0C\u4E0D\u4F1A\u5173\u95ED\u670D\u52A1\u5668\u3002" : "\u53EA\u505C\u6B62 Harness\uFF0C\u4E0D\u5173\u95ED\u670D\u52A1\u5668\u3002"),
     /* @__PURE__ */ import_react.default.createElement("div", { className: "dpm-dialog-actions" }, /* @__PURE__ */ import_react.default.createElement("button", { ref: cancel, onClick: () => {
       setConfirm(false);
       trigger.current?.focus();
     } }, "\u53D6\u6D88"), /* @__PURE__ */ import_react.default.createElement("button", { className: "dpm-shutdown", onClick: () => {
+      const action = confirm;
       setConfirm(false);
-      void begin("shutdown", void 0, "shutdown");
-    } }, "\u786E\u8BA4\u5173\u673A"))
+      void begin(action, void 0, action === "setup" ? "enable-and-restart" : "shutdown");
+    } }, confirm === "setup" ? "\u542F\u7528\u5E76\u91CD\u542F" : "\u786E\u8BA4\u5173\u673A"))
   )), document.body));
 }
 function PowerOverlay() {

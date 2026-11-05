@@ -102,6 +102,33 @@ test('Windows stops a still-starting task even before its listener ports open', 
   assert.deepEqual(calls, [['/End', '/TN', c.config.service]]);
 });
 
+test('Windows takeover waits for the interactive host to exit without terminating its process tree', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push(args);return { stdout: '' }; });
+  Object.assign(c.config, { backend: 'windows', service: 'DSH-Lifecycle-Example.Harness', taskTool: 'schtasks.exe' });
+  c.waitStopped = async () => calls.push('interactive host exited');
+  c.waitReady = async () => calls.push('ready');
+  await c.accept('takeover');await c.run();
+  assert.deepEqual(calls, ['interactive host exited', ['/Run', '/TN', c.config.service], 'ready']);
+  assert.equal(c.operation.phase, 'done');
+});
+
+test('takeover is refused for a non-Windows service', async t => {
+  const c = await fixture(t);
+  await assert.rejects(c.accept('takeover'), /Windows/);
+});
+
+test('a failed interactive shutdown never starts a competing Windows Harness', async t => {
+  const calls = [];
+  const c = await fixture(t, async (...args) => calls.push(args));
+  c.config.backend = 'windows';
+  c.waitStopped = async () => { throw new Error('Interactive host is still running'); };
+  await c.accept('takeover');await c.run();
+  assert.equal(c.operation.phase, 'failed');
+  assert.match(c.operation.error, /still running/);
+  assert.deepEqual(calls, []);
+});
+
 test('Windows npm updates use node plus npm-cli.js and restore the old tree on startup failure', async t => {
   const calls = [];
   let starts = 0;

@@ -2099,7 +2099,7 @@ var Controller = class {
       current,
       update: null,
       updateSupported: false,
-      updateReason: "\u6E90\u7801\u6784\u5EFA\uFF1A\u8BF7\u901A\u8FC7\u6E90\u7801\u5DE5\u4F5C\u6D41\u66F4\u65B0",
+      updateReason: this.config.updateReason || "\u6E90\u7801\u6784\u5EFA\uFF1A\u8BF7\u901A\u8FC7\u6E90\u7801\u5DE5\u4F5C\u6D41\u66F4\u65B0",
       operation: this.operation,
       platformNotice
     };
@@ -2124,7 +2124,8 @@ var Controller = class {
   }
   /** Claim an operation before returning HTTP 202; duplicate requests cannot race. */
   async accept(action, target) {
-    if (!["restart", "shutdown", "update"].includes(action)) throw new Error("Unknown action");
+    if (!["restart", "shutdown", "update", "takeover"].includes(action)) throw new Error("Unknown action");
+    if (action === "takeover" && this.config.backend !== "windows") throw new Error("Takeover requires Windows");
     if (action === "update" && this.config.sourceManifest) throw new Error("Source builds must be updated through their source workflow");
     if (this.operation && !["done", "failed"].includes(this.operation.phase)) throw new Error("Another power operation is running");
     this.operation = { id: randomUUID(), action, phase: "accepted", startedAt: Date.now(), error: null };
@@ -2146,7 +2147,13 @@ var Controller = class {
   async run() {
     const op = this.operation;
     try {
-      if (op.action === "update") await this.update(op);
+      if (op.action === "takeover") {
+        op.phase = "waiting-for-exit";
+        await this.waitStopped();
+        op.phase = "restarting";
+        await this.service("start");
+        await this.waitReady();
+      } else if (op.action === "update") await this.update(op);
       else {
         op.phase = op.action === "shutdown" ? "stopping" : "restarting";
         await this.service(op.action === "shutdown" ? "stop" : "restart");

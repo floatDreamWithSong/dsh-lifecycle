@@ -9,9 +9,9 @@ export const inject = ['slots', 'layout'];
 const BASE = '/api/dsh-lifecycle/power';
 let snapshot = { action: null, phase: '', error: null };
 const listeners = new Set();
-const titles = { restart: '正在重新启动', shutdown: '正在关闭 DeepSeek Harness', update: '正在更新 DeepSeek Harness' };
+const titles = { setup: '正在启用电源控制', restart: '正在重新启动', shutdown: '正在关闭 DeepSeek Harness', update: '正在更新 DeepSeek Harness' };
 const phases = { accepted: '正在准备，请稍候', downloading: '正在下载并安装新版本，服务仍可使用', validating: '正在检查新版本',
-  restarting: '正在重新启动服务', stopping: '正在停止 Harness 服务', 'rolling-back': '更新未成功，正在恢复原版本' };
+  restarting: '正在重新启动服务', stopping: '正在停止 Harness 服务', 'waiting-for-exit': '后台服务已就绪，正在切换托管', 'rolling-back': '更新未成功，正在恢复原版本' };
 
 function publish(value) {
   snapshot = { ...snapshot, ...value };
@@ -24,7 +24,7 @@ async function status(refreshToken) {
   const res = await fetch(BASE + (refreshToken ? '/refresh' : '/status'), options);
   if (!res.ok) {
     const detail = await res.json();
-    throw new Error(detail.error?.includes('ENOENT') ? '未安装电源控制服务，请按部署说明配置。' : detail.error || `状态检查失败（${res.status}）`);
+    throw new Error(detail.error || `状态检查失败（${res.status}）`);
   }
   return res.json();
 }
@@ -37,14 +37,15 @@ async function session() {
 }
 
 async function begin(action, target, confirm) {
-  publish({ action, phase: 'accepted', error: null });
+  publish({ action, phase: 'accepted', error: null, operationId: null });
   try {
     const before = await session();
-    const res = await fetch(BASE + '/action', { method: 'POST', headers: {
+    const res = await fetch(BASE + (action === 'setup' ? '/setup' : '/action'), { method: 'POST', headers: {
       'Content-Type': 'application/json', 'X-DSH-Power-Token': before.csrf,
     }, body: JSON.stringify({ action, target, confirm }) });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error);
+    if (action === 'setup' && !result.restartRequired) { window.location.reload();return; }
     publish({ original: before.instanceId, operationId: result.id, startedAt: Date.now() });
   } catch (error) { publish({ error: error.message }); }
 }
@@ -124,10 +125,14 @@ export function PowerMenu({ wide = true, openSecurity }) {
         <button type="button" className={'dpm-refresh' + (refreshing ? ' is-refreshing' : '')} aria-label="刷新检测" title="重新检测更新" disabled={refreshing} aria-busy={refreshing} onClick={() => { void loadInfo(true); }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round"/><path d="M6.1 6.1a8 8 0 0 1 13.1 2.2M4.8 15.7a8 8 0 0 0 13.1 2.2" strokeLinecap="round"/></svg>
         </button></span></div>
-      <button role="menuitem" onClick={() => { close(); void begin('restart'); }}><span>↻</span><div>重新启动<small>{info?.platformNotice ? '停止并重新启动托管进程' : '保存会话，重新加载服务'}</small></div></button>
+      {info?.installed === false && <>
+        <p className="dpm-warning" role="status">{info.setupReason}</p>
+        {info.setupAvailable && <button role="menuitem" onClick={() => { close(); setConfirm('setup'); }}><PowerIcon/><div>启用电源控制<small>自动配置，无需打开终端</small></div></button>}
+      </>}
+      <button role="menuitem" disabled={info?.installed === false} onClick={() => { close(); void begin('restart'); }}><span>↻</span><div>重新启动<small>{info?.platformNotice ? '停止并重新启动托管进程' : '保存会话，重新加载服务'}</small></div></button>
       {info?.update && <button role="menuitem" onClick={() => { close(); void begin('update', info.update); }}><span>↓</span><div>更新并重启<small>{info.current} → {info.update}</small></div><i className="dpm-dot"/></button>}
       <button role="menuitem" onClick={() => { close(); void lock(); }}><span>⌑</span><div>锁定<small>保留服务，锁定当前浏览器</small></div></button><button role="menuitem" onClick={() => { close(); openSecurity(); }}><span>⚙</span><div>登录与安全<small>验证方式、锁屏壁纸与会话管理</small></div></button><div className="dpm-divider"/>
-      <button className="dpm-danger" role="menuitem" onClick={() => { close(); setConfirm(true); }}><PowerIcon/><div>关机<small>停止 Harness 服务</small></div></button>
+      <button className="dpm-danger" role="menuitem" disabled={info?.installed === false} onClick={() => { close(); setConfirm('shutdown'); }}><PowerIcon/><div>关机<small>停止 Harness 服务</small></div></button>
       {(error || info?.checkError || info?.updateReason) && <p className="dpm-warning" role="status">{error || (info?.checkError ? '版本检查失败：' + info.checkError : info.updateReason)}</p>}
       {info?.platformNotice && <p className="dpm-warning" role="status">{info.platformNotice}</p>}
     </div>, document.body)}
@@ -140,11 +145,11 @@ export function PowerMenu({ wide = true, openSecurity }) {
             const i = items.indexOf(document.activeElement); e.preventDefault(); items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length].focus();
           }
         }}>
-        <div className="dpm-dialog-icon"><PowerIcon/></div><h2 id="dpm-confirm-title">关闭 DeepSeek Harness？</h2>
-        <p id="dpm-confirm-body">会话会保存，正在运行的任务将中断。关闭后网页无法访问，需要在服务器上重新启动服务。</p>
-        <p className="dpm-note">只停止 Harness，不关闭服务器。</p>
+        <div className="dpm-dialog-icon"><PowerIcon/></div><h2 id="dpm-confirm-title">{confirm === 'setup' ? '启用电源控制？' : '关闭 DeepSeek Harness？'}</h2>
+        <p id="dpm-confirm-body">{confirm === 'setup' ? '将自动安装当前 Windows 用户的后台服务，并重新启动 Harness。会话会保留，正在运行的任务会中断。' : '会话会保存，正在运行的任务将中断。关闭后网页无法访问，需要在服务器上重新启动服务。'}</p>
+        <p className="dpm-note">{confirm === 'setup' ? '登录 Windows 后会自动启动 Harness。使用当前用户权限，不会关闭服务器。' : '只停止 Harness，不关闭服务器。'}</p>
         <div className="dpm-dialog-actions"><button ref={cancel} onClick={() => { setConfirm(false); trigger.current?.focus(); }}>取消</button>
-          <button className="dpm-shutdown" onClick={() => { setConfirm(false); void begin('shutdown', undefined, 'shutdown'); }}>确认关机</button></div>
+          <button className="dpm-shutdown" onClick={() => { const action = confirm;setConfirm(false);void begin(action, undefined, action === 'setup' ? 'enable-and-restart' : 'shutdown'); }}>{confirm === 'setup' ? '启用并重启' : '确认关机'}</button></div>
       </section>
     </div>, document.body)}
   </>;

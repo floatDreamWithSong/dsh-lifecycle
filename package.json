@@ -1,7 +1,7 @@
 {
   "name": "dsh-lifecycle",
-  "version": "0.1.9",
-  "description": "Lock screen, persistent authentication and lifecycle controls for DeepSeek Harness with Windows Task Scheduler support.",
+  "version": "0.1.10",
+  "description": "安装后请立即刷新页面进入登录/首次设置；旧页面显示无法连接或 HTTP 401 不代表安装失败。DeepSeek Harness Web 锁屏、持久登录及电源管理，Windows 支持页面一键启用后台服务。",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -42,6 +42,7 @@
     "test": "node --test tests/*.test.js tests/lib/*.test.js tests/host/*.test.js tests/supervisor/*.test.js tests/utils/*.test.js",
     "test:ui": "playwright test",
     "test:windows": "node --test tests/integration/windows.test.js",
+    "test:windows-setup": "node --test tests/integration/windows-setup.test.js",
     "pretest:windows": "npm run build",
     "test:windows-update": "node --test tests/integration/windows-update.test.js",
     "pretest:windows-update": "npm run build",

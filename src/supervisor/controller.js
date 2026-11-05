@@ -31,7 +31,7 @@ export class Controller {
     const platformNotice = this.config.backend === 'windows' ? 'Windows：停止整个托管进程树，运行中的任务会中断' : undefined;
     // Source checkouts are owned by the developer; never replace them with an npm release.
     if (this.config.sourceManifest) return { current, update: null, updateSupported: false,
-      updateReason: '源码构建：请通过源码工作流更新', operation: this.operation, platformNotice };
+      updateReason: this.config.updateReason || '源码构建：请通过源码工作流更新', operation: this.operation, platformNotice };
     if (forceRefresh || !this.check || Date.now() - this.check.checkedAt > 600000) {
       this.checking ??= this.getPublished(this.config.channel).then(latest => {
         this.check = { latest, checkedAt: Date.now(), checkError: null };
@@ -46,7 +46,8 @@ export class Controller {
 
   /** Claim an operation before returning HTTP 202; duplicate requests cannot race. */
   async accept(action, target) {
-    if (!['restart', 'shutdown', 'update'].includes(action)) throw new Error('Unknown action');
+    if (!['restart', 'shutdown', 'update', 'takeover'].includes(action)) throw new Error('Unknown action');
+    if (action === 'takeover' && this.config.backend !== 'windows') throw new Error('Takeover requires Windows');
     if (action === 'update' && this.config.sourceManifest) throw new Error('Source builds must be updated through their source workflow');
     if (this.operation && !['done', 'failed'].includes(this.operation.phase)) throw new Error('Another power operation is running');
     // Reserve before awaiting registry IO, including when two update requests arrive together.
@@ -68,7 +69,14 @@ export class Controller {
   async run() {
     const op = this.operation;
     try {
-      if (op.action === 'update') await this.update(op);
+      if (op.action === 'takeover') {
+        // Never kill an interactive terminal or adopt its PID: the host requests its own bounded shutdown.
+        op.phase = 'waiting-for-exit';
+        await this.waitStopped();
+        op.phase = 'restarting';
+        await this.service('start');
+        await this.waitReady();
+      } else if (op.action === 'update') await this.update(op);
       else {
         op.phase = op.action === 'shutdown' ? 'stopping' : 'restarting';
         await this.service(op.action === 'shutdown' ? 'stop' : 'restart');
