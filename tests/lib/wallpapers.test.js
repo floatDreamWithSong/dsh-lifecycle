@@ -12,7 +12,7 @@ test('default selection requires no file; owner-only library files survive reads
   assert.deepEqual(wallpaperLibrary(),{version:1,selected:null,items:[]});
   const item=addWallpaper(png,'My photo.png','image/png');selectWallpaper(item.id);
   assert.equal(wallpaperLibrary().selected,item.id);assert.deepEqual(wallpaperImage(item.id).bytes,png);
-  assert.equal(statSync(path.join(home,'lifecycle','wallpapers',item.id+'.png')).mode&0o777,0o600);
+  if (process.platform !== 'win32') assert.equal(statSync(path.join(home,'lifecycle','wallpapers',item.id+'.png')).mode&0o777,0o600);
   deleteWallpaper(item.id);assert.equal(wallpaperLibrary().selected,null);assert.equal(wallpaperImage(item.id),null);
 });
 test('rejects active content, mismatched media types, oversized images and unknown IDs',()=>{

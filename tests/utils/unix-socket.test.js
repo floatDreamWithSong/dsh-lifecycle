@@ -7,7 +7,7 @@ import net from 'node:net';
 import { once } from 'node:events';
 import { prepareSocket } from '../../src/utils/unix-socket.js';
 
-test('controller startup never deletes an active socket or a regular file', async t => {
+test('controller startup never deletes an active socket or a regular file', { skip: process.platform === 'win32' && 'Unix-domain filesystem sockets are not the Windows named-pipe backend' }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-sock-'));
   const socketPath = path.join(root, 's');
   t.after(() => rm(root, { recursive: true, force: true }));

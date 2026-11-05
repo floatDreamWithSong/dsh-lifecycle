@@ -16,7 +16,7 @@ test('Windows tasks use the interactive user, escape XML and never use a command
   assert.match(xml, /研发 &amp; tools/);
   assert.match(xml, /&quot;/);
   assert.doesNotMatch(xml, /Password|HighestAvailable|cmd\.exe|powershell|RestartOnFailure/);
-  assert.match(xml, /not yet verified on Windows hardware/);
+  assert.match(xml, /per-user background service/);
   assert.match(windowsTaskXml({ sid: 'S-1-5-21-1', command: ['C:\\node.exe'], cwd: 'C:\\data', keepAlive: true }), /RestartOnFailure/);
   assert.throws(() => windowsTaskXml({ sid: '<bad>', command: ['node'], cwd: 'relative' }), /Invalid/);
 });

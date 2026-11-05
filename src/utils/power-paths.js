@@ -8,6 +8,6 @@ export function powerPaths(platform = process.platform, home = os.homedir(), loc
     const root = path.win32.join(local, 'dsh-lifecycle');
     return { root, config: path.win32.join(root, 'config.json') };
   }
-  const root = platform === 'darwin' ? path.join(home, 'Library/Application Support/dsh-lifecycle') : '/etc/dsh-lifecycle';
-  return { root, config: path.join(root, 'config.json'), socket: platform === 'darwin' ? path.join(root, 'control.sock') : '/run/dsh-lifecycle/control.sock' };
+  const root = platform === 'darwin' ? path.posix.join(home, 'Library/Application Support/dsh-lifecycle') : '/etc/dsh-lifecycle';
+  return { root, config: path.posix.join(root, 'config.json'), socket: platform === 'darwin' ? path.posix.join(root, 'control.sock') : '/run/dsh-lifecycle/control.sock' };
 }

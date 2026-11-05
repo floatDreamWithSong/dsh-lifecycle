@@ -15,7 +15,7 @@ test('completed session survives a new store without persisting its bearer token
   const first = new SessionStore(), token = first.issue();first.markOTPVerified(token);first.flush();
   const disk = readFileSync(lifecyclePath('sessions.json'), 'utf8');
   assert.equal(disk.includes(token), false);assert.equal(disk.includes('tempOTP'), false);
-  assert.equal(statSync(lifecyclePath('sessions.json')).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(statSync(lifecyclePath('sessions.json')).mode & 0o777, 0o600);
   const restarted = new SessionStore();assert.equal(restarted.isValid(token), true);assert.equal(restarted.isOTPVerified(token), true);
 });
 test('initial-password and pending second-factor sessions never survive restart', () => {

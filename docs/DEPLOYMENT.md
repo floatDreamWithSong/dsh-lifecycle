@@ -99,9 +99,9 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/net.deepseek.dsh-
 
 升级插件不会自动替换已复制的独立控制程序。升级控制程序或修改启动参数时，先按下面的卸载步骤停用两个 LaunchAgent，备份并移走原来的配置目录，再运行安装器；保留认证数据目录。
 
-## Windows 电源服务（实验支持，暂未实机验证）
+## Windows 电源服务
 
-提供了 Windows 10/11 任务计划程序的安装器与控制逻辑。当前仅验证了跨平台单元测试、模拟命令调用和界面提示，**没有在 Windows 实机注册任务、连接命名管道或执行重启／更新**；暂不视为 Windows 已验证支持。
+Windows 11 已完成真实任务注册、命名管道鉴权、首次设置、登录、锁屏、重启、停止、npm 更新及失败回滚验证；具体版本、检查命令及限制见 [Windows 验证记录](WINDOWS-VALIDATION.md)。Windows 10 未单独实测。
 
 安装器为当前登录用户注册两个任务，分别运行 Harness 和独立控制服务。任务使用当前用户的交互式登录权限，不保存 Windows 密码、不要求提升到管理员；组织策略若拒绝注册任务，安装器会直接报错。退出该 Windows 用户后，服务不可继续保证运行。
 
@@ -117,13 +117,17 @@ $plugin = Join-Path $HOME '.dsh\profiles\web\node_modules\dsh-lifecycle'
   -- "$node" --import tsx/esm apps/cli/src/bin.ts web --no-open
 ```
 
-安装器要求直接启动 `node.exe`，不接受 `pnpm.cmd`、`npm.cmd` 或 PowerShell 包装启动命令。需要自定义端口时，同时修改安装器的 `--port` 和 CLI 的 `--port`；使用自定义 `DSH_HOME` 时，在运行安装器前设置 `$env:DSH_HOME`。
+传给安装器的启动命令必须以 `node.exe` 开头，不接受 `pnpm.cmd`、`npm.cmd` 或自定义 shell 包装。任务内部使用 Windows 自带的 PowerShell 隐藏启动器，通过 Win32 `CreateProcess` 直接启动 Node，不把用户参数当作 PowerShell 表达式执行；进程恢复运行前先加入 kill-on-close Job Object，结束任务时连同子孙进程一起停止。组织策略必须允许该本地脚本及 `Add-Type`，否则安装会明确失败，不会降级为无托管进程。
+
+需要自定义端口时，同时修改安装器的 `--port` 和 CLI 的 `--port`；使用自定义 `DSH_HOME` 时，在运行安装器前设置 `$env:DSH_HOME`。CLI 的 `--patch` 参数放在 `web` 后、`--no-open` 等应用参数之前。
 
 npm 管理的独立安装用 `--install-root 'C:\DSH\harness' --npm-cli 'C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js'` 替代 `--source-manifest`，并让启动命令指向该安装目录内的 CLI。以上路径需要按本机实际安装替换。更新通过 Node 调用 `npm-cli.js`，不经过 `cmd.exe`；不要使用全局共享 npm 前缀作为安装目录。
 
-控制文件与控制台日志位于 `%LOCALAPPDATA%\dsh-lifecycle\`。安装器先将目录 ACL 限制为当前用户，再写入配置；控制链路使用随机命名管道与独立令牌。`config.json` 含本地控制凭据，不要上传或粘贴到公开场合。认证数据仍使用原来的 `DSH_HOME`。
+控制文件与控制台日志默认位于 `%LOCALAPPDATA%\dsh-lifecycle\`。安装器先将目录 ACL 限制为当前用户，再写入配置；控制链路使用随机命名管道与独立令牌。`config.json` 含本地控制凭据，不要上传或粘贴到公开场合。认证数据仍使用原来的 `DSH_HOME`，应放在当前用户独享的目录。Windows 文件访问控制依赖 ACL，而不是 Unix 的 `chmod 0600`。
 
-电源面板会显示「Windows 支持暂未实机验证」。关机只结束 Harness 对应的任务，不关闭 Windows。停止路径使用任务计划程序结束进程，**不能承诺等同于 Unix 的优雅退出**；会话恢复、子进程清理、端口释放和 npm 更新回滚都需要 Windows 实机验证。源码构建不会自动更新或覆盖仓库。
+在 Codex 等打包应用的终端中，AppData 写入可能被重定向到应用私有目录，导致任务计划程序看不到文件。此时给安装器增加 `--controller-root 'D:\DSH\lifecycle-controller'`，指定未被重定向的本地绝对路径，目录必须尚不存在。启动器从自己的相邻位置读取配置，不依赖任务环境重新猜测 AppData。不同自定义控制目录使用不同任务名；多个实例还必须使用不同 `DSH_HOME` 和端口。安装器会等待控制服务及 Harness 就绪，注册成功但启动失败不会再被报告为安装成功。
+
+电源面板会提醒停止整个托管进程树会中断运行中的任务。关机只停止 Harness，不关闭 Windows，独立控制服务继续运行。Windows 停止属于强制结束，不等同于 Unix 的优雅退出；已完成登录会持久保存，但正在运行的模型请求、工具和未提交写入可能中断。源码构建不会自动更新或覆盖仓库。
 
 ```powershell
 # 查看启动日志和初始密码；不要公开日志内容
@@ -133,7 +137,7 @@ $config = Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\config.json" -Raw -Encodi
 schtasks.exe /Run /TN $config.service
 ```
 
-升级独立控制程序前，先按卸载步骤停用两个任务并备份控制目录，再运行新安装器。安装器不会覆盖同名任务或现有配置。
+从 0.1.6 升级时必须重装独立控制服务，才能使用隐藏启动器及进程树清理；仅更新 profile 中的 npm 包不会替换已复制的控制程序。先按卸载步骤停用两个任务并备份控制目录，再运行新安装器，保留原 `DSH_HOME`。安装器不会覆盖同名任务或现有配置。使用自定义控制目录时，日志及卸载命令中的配置路径也要对应修改。
 
 ## 数据和登录恢复
 

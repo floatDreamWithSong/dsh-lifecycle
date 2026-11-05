@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8');
+const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
 // Execute the shipped !!js scalars against CLI startup values. The consumer
 // needs an external URL even though webServer.getOrigin() is the internal port.
 const runtime = patch.split('- id: web-runtime\n')[1].split('\n- insert:')[0];

@@ -6,10 +6,10 @@ import { powerPaths } from '../utils/power-paths.js';
 import { prepareSocket } from '../utils/unix-socket.js';
 import { windowsControlTarget, authorizedWindowsControl } from '../utils/windows-control.js';
 import { windowsSystemTool } from './windows.js';
-import { createWriteStream } from 'node:fs';
-import { Console } from 'node:console';
+import { parseArgs } from 'node:util';
 
-const config = JSON.parse(await readFile(process.env.DSH_LIFECYCLE_CONFIG || powerPaths().config, 'utf8'));
+const { values } = parseArgs({ options: { config: { type: 'string' } } });
+const config = JSON.parse(await readFile(values.config || process.env.DSH_LIFECYCLE_CONFIG || powerPaths().config, 'utf8'));
 if (config.backend === 'launchd') {
   if (process.platform !== 'darwin' || config.domain !== 'gui/' + process.getuid()
     || !/^[a-zA-Z0-9_.-]+$/.test(config.service) || !config.plist?.startsWith('/')) throw new Error('Invalid per-user launchd target');
@@ -17,8 +17,7 @@ if (config.backend === 'launchd') {
   if (process.platform !== 'win32' || !/^[a-zA-Z0-9_.-]+$/.test(config.service)
     || config.taskTool?.toLowerCase() !== windowsSystemTool('schtasks.exe').toLowerCase()) throw new Error('Invalid Windows scheduled task');
   windowsControlTarget(config);
-  const log = createWriteStream(config.controllerLog, { flags: 'a' });
-  globalThis.console = new Console({ stdout: log, stderr: log });
+  Object.assign(process.env, config.environment);
 } else if (config.backend && config.backend !== 'systemd') throw new Error('Unsupported power backend');
 else if (!/^[a-zA-Z0-9_.@-]+\.service$/.test(config.service)) throw new Error('Invalid systemd unit');
 if (!['latest', 'next', 'alpha'].includes(config.channel)) throw new Error('Invalid release channel');

@@ -1,0 +1,4 @@
+# Keyless real-host smoke: do not open the unrelated model-account onboarding.
+- id: ui-settings-models
+  config:
+    credentialOnboarding: false

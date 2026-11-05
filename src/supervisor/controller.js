@@ -28,7 +28,7 @@ export class Controller {
   /** Cache registry checks for ten minutes; a failed check is explicit and retryable. */
   async status(forceRefresh = false) {
     const current = await this.installedVersion();
-    const platformNotice = this.config.backend === 'windows' ? 'Windows 支持暂未实机验证' : undefined;
+    const platformNotice = this.config.backend === 'windows' ? 'Windows：停止整个托管进程树，运行中的任务会中断' : undefined;
     // Source checkouts are owned by the developer; never replace them with an npm release.
     if (this.config.sourceManifest) return { current, update: null, updateSupported: false,
       updateReason: '源码构建：请通过源码工作流更新', operation: this.operation, platformNotice };
@@ -87,12 +87,12 @@ export class Controller {
     if (this.config.backend === 'windows') {
       if (verb === 'restart') { await this.service('stop'); return this.service('start'); }
       if (verb === 'stop') {
-        if (await this.windowsStopped()) return;
-        await this.execute(this.config.taskTool, ['/End', '/TN', this.config.service], { timeout: 90000 });
+        // /End is idempotent, including a task that has not opened its ports yet.
+        await this.execute(this.config.taskTool, ['/End', '/TN', this.config.service], { timeout: 90000, windowsHide: true });
         await this.waitStopped();
         return;
       }
-      return this.execute(this.config.taskTool, ['/Run', '/TN', this.config.service], { timeout: 90000 });
+      return this.execute(this.config.taskTool, ['/Run', '/TN', this.config.service], { timeout: 90000, windowsHide: true });
     }
     if (this.config.backend === 'launchd') {
       const { domain, service, plist } = this.config;
@@ -141,7 +141,7 @@ export class Controller {
     await mkdir(stage, { mode: 0o755 });
     if (c.backend === 'windows') {
       await this.execute(c.node, [c.npmCli, 'install', '--prefix', stage, '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund', '@deepseek-ai/dsh@' + op.target],
-        { timeout: 600000, maxBuffer: 8 * 1024 * 1024, cwd: stage, env: { ...process.env, HOME: c.home } });
+        { timeout: 600000, maxBuffer: 8 * 1024 * 1024, windowsHide: true, cwd: stage, env: { ...process.env, HOME: c.home } });
     } else if (c.backend === 'launchd') {
       await this.execute(c.npm, ['install', '--prefix', stage, '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund', '@deepseek-ai/dsh@' + op.target],
         { timeout: 600000, maxBuffer: 8 * 1024 * 1024, cwd: stage, env: { ...process.env, HOME: c.home } });
@@ -157,7 +157,7 @@ export class Controller {
     op.phase = 'validating';
     const cli = path.join(stage, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
     const result = ['launchd', 'windows'].includes(c.backend)
-      ? await this.execute(c.node, [cli, '--version'], { timeout: 30000, cwd: c.home })
+      ? await this.execute(c.node, [cli, '--version'], { timeout: 30000, windowsHide: true, cwd: c.home })
       : await this.execute('/usr/sbin/runuser', ['-u', c.user, '--', c.node, cli, '--version'], { timeout: 30000, cwd: c.home });
     if (result.stdout.trim() !== op.target) throw new Error('Staged CLI version does not match the requested release');
     op.phase = 'restarting';

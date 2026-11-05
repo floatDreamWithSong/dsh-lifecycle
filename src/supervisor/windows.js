@@ -11,7 +11,8 @@ export function windowsArguments(args) {
 
 /** Resolve only the Windows management tools used by the fixed lifecycle operations. */
 export function windowsSystemTool(name, root = process.env.SystemRoot) {
-  if (!['schtasks.exe', 'icacls.exe', 'whoami.exe'].includes(name) || !root || !/^[A-Za-z]:\\/.test(root)) throw new Error('Invalid Windows system tool');
+  if (!['schtasks.exe', 'icacls.exe', 'whoami.exe', 'powershell.exe'].includes(name) || !root || !/^[A-Za-z]:\\/.test(root)) throw new Error('Invalid Windows system tool');
+  if (name === 'powershell.exe') return path.win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', name);
   return path.win32.join(root, 'System32', name);
 }
 
@@ -21,7 +22,7 @@ export function windowsTaskXml({ sid, command, cwd, keepAlive = false }) {
   const xml = value => String(value).replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[char]));
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.3" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-<RegistrationInfo><Description>DSH Lifecycle Windows support: not yet verified on Windows hardware.</Description></RegistrationInfo>
+<RegistrationInfo><Description>DSH Lifecycle per-user background service.</Description></RegistrationInfo>
 <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>${xml(sid)}</UserId></LogonTrigger></Triggers>
 <Principals><Principal id="Owner"><UserId>${xml(sid)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
 <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>false</StartWhenAvailable><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><ExecutionTimeLimit>PT0S</ExecutionTimeLimit>${keepAlive ? '<RestartOnFailure><Interval>PT1M</Interval><Count>3</Count></RestartOnFailure>' : ''}</Settings>

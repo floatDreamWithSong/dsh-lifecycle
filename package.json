@@ -1,7 +1,7 @@
 {
   "name": "dsh-lifecycle",
-  "version": "0.1.6",
-  "description": "Windows-inspired lock screen, persistent authentication and lifecycle controls for DeepSeek Harness; Windows power support is experimental.",
+  "version": "0.1.7",
+  "description": "Lock screen, persistent authentication and lifecycle controls for DeepSeek Harness with Windows Task Scheduler support.",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -41,6 +41,10 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.js tests/lib/*.test.js tests/host/*.test.js tests/supervisor/*.test.js tests/utils/*.test.js",
     "test:ui": "playwright test",
+    "test:windows": "node --test tests/integration/windows.test.js",
+    "pretest:windows": "npm run build",
+    "test:windows-update": "node --test tests/integration/windows-update.test.js",
+    "pretest:windows-update": "npm run build",
     "prepack": "npm run build",
     "pretest": "npm run build",
     "pretest:ui": "npm run build"

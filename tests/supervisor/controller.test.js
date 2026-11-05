@@ -80,7 +80,7 @@ test('Windows restarts only its fixed scheduled task and waits for stop and star
     [c.config.taskTool, ['/Run', '/TN', c.config.service]], 'ready',
   ]);
   assert.equal(c.operation.phase, 'done');
-  const info = await c.status();assert.match(info.platformNotice, /暂未实机验证/);
+  const info = await c.status();assert.match(info.platformNotice, /进程树/);
 });
 
 test('Windows does not start a replacement if stopping the managed task fails', async t => {
@@ -91,6 +91,15 @@ test('Windows does not start a replacement if stopping the managed task fails', 
   await c.accept('restart');await c.run();
   assert.equal(c.operation.phase, 'failed');
   assert.equal(calls.length, 1);assert.equal(calls[0][0], '/End');
+});
+
+test('Windows stops a still-starting task even before its listener ports open', async t => {
+  const calls = [];
+  const c = await fixture(t, async (command, args) => { calls.push(args);return { stdout: '' }; });
+  Object.assign(c.config, { backend: 'windows', service: 'DSH-Lifecycle-Example.Harness', taskTool: 'schtasks.exe' });
+  c.windowsStopped = async () => true;
+  await c.service('stop');
+  assert.deepEqual(calls, [['/End', '/TN', c.config.service]]);
 });
 
 test('Windows npm updates use node plus npm-cli.js and restore the old tree on startup failure', async t => {
@@ -122,7 +131,7 @@ test('shutdown stops only Harness, and never shuts down the OS or launches a hel
   assert.deepEqual(calls[0].slice(0, 2), ['/usr/bin/systemctl', ['stop', 'example.service']]);
 });
 
-test('failed update readiness restores the prior install and starts it again', async t => {
+test('failed update readiness restores the prior install and starts it again', { skip: process.platform === 'win32' && 'systemd ownership requires Unix; Windows rollback is tested separately' }, async t => {
   const calls = [];
   let c;
   c = await fixture(t, async (command, args) => {
