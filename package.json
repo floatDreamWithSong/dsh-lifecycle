@@ -1,6 +1,6 @@
 {
   "name": "dsh-lifecycle",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Lock screen, persistent authentication and lifecycle controls for DeepSeek Harness with Windows Task Scheduler support.",
   "type": "module",
   "main": "./index.js",

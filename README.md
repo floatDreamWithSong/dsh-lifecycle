@@ -23,6 +23,10 @@
 dsh plugin --profile web add dsh-lifecycle
 ```
 
+也可从 GitHub 安装：`dsh plugin --profile web add github:floatDreamWithSong/dsh-lifecycle`。仓库包含已构建的 `dist`，安装时不需要执行构建脚本。0.1.7 的旧 GitHub 安装缺少这些文件，应重新安装更新后的提交，或改用 npm 来源。
+
+当前验证范围为 **Web profile**，不代表 Electron Desktop profile 已适配。Desktop 使用随机端口和 `dsh-app://` 原生通道，需要单独的认证接入，不能直接套用 Web 网关。桌面端首次设置将保留随机密码并采用本机界面展示，不会改为公开的固定初始密码；该桌面适配尚未完成。
+
 请使用运行 Harness 的账户，以及相同的 HOME / DSH_HOME 安装。
 
 安装后按[部署说明](docs/DEPLOYMENT.md)安装对应平台的电源控制服务，再重启 Harness；公网部署还需配置 HTTPS。
