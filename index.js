@@ -14,7 +14,7 @@
 import { createGateway, lanAddresses } from './lib/gateway.js'
 import { Config } from './lib/config.js'
 import { AuditLogWriter } from './lib/audit-log.js'
-import { hasPassword, setPassword, generateInitialPassword } from './lib/store.js'
+import { hasPassword, isInitialPassword, readInitialPassword, setPassword, generateInitialPassword } from './lib/store.js'
 import { hasOTP, getOTPStatus } from './lib/otp-store.js'
 import { buildLanTrustScript } from './lib/lan-trust-script.js'
 import { createCachedSecretReader } from './lib/upstream-auth.js'
@@ -256,37 +256,14 @@ export async function apply(ctx, config) {
     auditLog.append(payload)
   }
 
-  // Fail loud on a taken port (misconfiguration), like the webserver does.
-  await gateway.start()
-
-  // First run: mint an auto-generated initial password BEFORE the gateway
-  // serves anything. The plaintext is printed once to the console (this
-  // machine — the local trust model); the stored record is scrypt-hashed
-  // with an `initial` marker, and any session logged in with it is forced
-  // through /onboarding until the user sets a personal password.
-  if (!hasPassword()) {
+  // Complete first-run state before listening. Legacy unclaimed credentials
+  // have no recoverable plaintext and are rotated for the setup-page flow.
+  if (!hasPassword() || isInitialPassword() && !readInitialPassword()) {
     const initial = generateInitialPassword()
     await setPassword(initial, { initial: true })
-    // Bilingual notice: the full Chinese block first, then the full English
-    // block, split by a dashed line — the same credential either way (a
-    // single `initial` value). The host console cannot know the browser's
-    // language reliably, so both are shown.
-    console.log('')
-    console.log('============================================================')
-    console.log('  DSH Lifecycle: 首次部署初始密码')
-    console.log(`  初始密码: ${initial}`)
-    console.log('  请使用该密码登录；登录后将引导你设置新的访问密码。')
-    console.log('  （初始密码为一次性凭据，设置新密码后自动失效）')
-    console.log('  初次登录可在引导页绑定 OTP，或稍后在「认证设置」面板中绑定。')
-    console.log('------------------------------------------------------------')
-    console.log('  DSH Lifecycle: first-run initial password')
-    console.log(`  Initial password: ${initial}`)
-    console.log('  Log in with it; you will be guided to set your own access password.')
-    console.log('  (One-time credential — invalidated once you set a new password)')
-    console.log('  You can bind OTP on the onboarding page, or later from the Auth Settings panel.')
-    console.log('============================================================')
-    console.log('')
   }
+  await gateway.start()
+  console.log('[dsh-lifecycle] 登录验证已启用：安装后请务必刷新页面进入登录或首次设置。旧页面收到 HTTP 401 不代表服务无法连接。初始密码仅在首次设置页展示，不在终端打印。')
 
   ctx.effect(() => async () => {
     await gateway.close()

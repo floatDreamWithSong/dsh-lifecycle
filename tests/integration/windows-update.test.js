@@ -32,11 +32,9 @@ test('real Windows npm update restores an unbootable release, then upgrades thro
     catch { return 0; }
   }, { timeout: 60000, intervals: [1000] }).toBe(200);
   await page.goto(base + '/login');
-  // The initial secret is read locally; no credentials are printed in the test output.
+  // First-run credentials are displayed by the setup page, never read from terminal logs.
   if (await page.getByLabel('初始密码', { exact: true }).isVisible()) {
-    const initial = readFileSync(config.harnessLog, 'utf8').match(/Initial password: (.+)/)?.[1].trim();
-    assert.ok(initial);
-    await page.getByLabel('初始密码', { exact: true }).fill(initial);
+    await expect(page.getByLabel('初始密码', { exact: true })).not.toHaveValue('');
     await page.getByRole('button', { name: '下一步 →' }).click();
     await page.getByLabel('新密码', { exact: true }).fill(password);
     await page.getByLabel('确认密码', { exact: true }).fill(password);

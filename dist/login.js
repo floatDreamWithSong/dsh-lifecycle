@@ -790,7 +790,13 @@
     app.querySelector("input")?.focus();
   }
   function setupInitial() {
-    oobe("\u4ECE\u8FD9\u91CC\uFF0C\u5F00\u59CB\u4F60\u7684\u5DE5\u4F5C\u7A7A\u95F4", "\u9996\u6B21\u4F7F\u7528\u9700\u8981\u9A8C\u8BC1\u670D\u52A1\u5668\u751F\u6210\u7684\u521D\u59CB\u5BC6\u7801\u3002\u63A5\u4E0B\u6765\uFF0C\u4F60\u5C06\u8BBE\u7F6E\u81EA\u5DF1\u7684\u5BC6\u7801\uFF0C\u5E76\u9009\u62E9\u9002\u5408\u4F60\u7684\u767B\u5F55\u65B9\u5F0F\u3002", '<form><label for="initial-password">\u521D\u59CB\u5BC6\u7801</label><input id="initial-password" name="password" type="password" autocomplete="current-password" placeholder="\u8F93\u5165\u670D\u52A1\u5668\u63A7\u5236\u53F0\u4E2D\u7684\u521D\u59CB\u5BC6\u7801" required><p class="initial-note">\u521D\u59CB\u5BC6\u7801\u4E0D\u4F1A\u5728\u7F51\u9875\u516C\u5F00\u663E\u793A\u3002\u5B8C\u6210\u521D\u59CB\u5316\u540E\uFF0C\u5B83\u5C06\u81EA\u52A8\u5931\u6548\u3002</p><div class="button-row"><button type="submit" class="primary">\u4E0B\u4E00\u6B65 \u2192</button></div></form>', 0);
+    oobe("\u4ECE\u8FD9\u91CC\uFF0C\u5F00\u59CB\u4F60\u7684\u5DE5\u4F5C\u7A7A\u95F4", "\u5B89\u88C5\u540E\u65E7\u9875\u9762\u8FD4\u56DE 401 \u662F\u767B\u5F55\u9A8C\u8BC1\u5DF2\u751F\u6548\uFF0C\u8BF7\u5237\u65B0\u8FDB\u5165\u6B64\u9875\u3002\u968F\u673A\u521D\u59CB\u5BC6\u7801\u5728\u4E0B\u65B9\u663E\u793A\uFF0C\u9A8C\u8BC1\u540E\u5FC5\u987B\u7ACB\u5373\u8BBE\u7F6E\u81EA\u5DF1\u7684\u5BC6\u7801\u3002", '<form><label for="initial-password">\u521D\u59CB\u5BC6\u7801</label><input id="initial-password" name="password" type="text" autocomplete="off" placeholder="\u6B63\u5728\u8BFB\u53D6\u968F\u673A\u521D\u59CB\u5BC6\u7801" readonly required><p class="initial-note">\u6B64\u5BC6\u7801\u5BF9\u53EF\u8BBF\u95EE\u9996\u6B21\u8BBE\u7F6E\u9875\u7684\u8BBF\u5BA2\u53EF\u89C1\uFF0C\u8BF7\u5728\u53D7\u63A7\u73AF\u5883\u7ACB\u5373\u5B8C\u6210\u521D\u59CB\u5316\u3002\u6539\u5BC6\u540E\u4E0D\u518D\u5C55\u793A\u3002</p><div class="button-row"><button type="submit" class="primary" disabled>\u4E0B\u4E00\u6B65 \u2192</button></div></form>', 0);
+    const input = app.querySelector("#initial-password");
+    void post("/lifecycle/bootstrap").then((result) => {
+      if (!input.isConnected) return;
+      input.value = result.initialPassword;
+      app.querySelector("button[type=submit]").disabled = false;
+    }).catch(message);
     wireForm(async (data) => {
       initialPassword = String(data.get("password"));
       const result = await post("/lifecycle/login", { method: "password", password: initialPassword });

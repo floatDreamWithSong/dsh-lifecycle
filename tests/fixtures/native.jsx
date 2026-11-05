@@ -9,6 +9,10 @@ const ctx={
   slots:{inject(name,fn){fn();},register(options,component){entries.set(options.name+':'+(options.key||options.id),component);}},
 };
 apply(ctx);
+window.__simulateLifecycleInstall = () => {
+  for (const dispose of effects.splice(0)) if (typeof dispose === 'function') dispose();
+  apply(ctx);
+};
 function Fixture(){
   const [panel,setPanel]=useState(null);navigate=setPanel;
   const Power=entries.get('sidebar.footer.action:dsh-lifecycle-power'),Security=entries.get('main:dsh-lifecycle-security');

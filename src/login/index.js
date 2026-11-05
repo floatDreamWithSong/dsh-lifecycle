@@ -98,7 +98,13 @@ function oobe(title, description, content, step) {
 }
 
 function setupInitial() {
-  oobe('从这里，开始你的工作空间', '首次使用需要验证服务器生成的初始密码。接下来，你将设置自己的密码，并选择适合你的登录方式。', '<form><label for="initial-password">初始密码</label><input id="initial-password" name="password" type="password" autocomplete="current-password" placeholder="输入服务器控制台中的初始密码" required><p class="initial-note">初始密码不会在网页公开显示。完成初始化后，它将自动失效。</p><div class="button-row"><button type="submit" class="primary">下一步 →</button></div></form>', 0);
+  oobe('从这里，开始你的工作空间', '安装后旧页面返回 401 是登录验证已生效，请刷新进入此页。随机初始密码在下方显示，验证后必须立即设置自己的密码。', '<form><label for="initial-password">初始密码</label><input id="initial-password" name="password" type="text" autocomplete="off" placeholder="正在读取随机初始密码" readonly required><p class="initial-note">此密码对可访问首次设置页的访客可见，请在受控环境立即完成初始化。改密后不再展示。</p><div class="button-row"><button type="submit" class="primary" disabled>下一步 →</button></div></form>', 0);
+  const input = app.querySelector('#initial-password');
+  void post('/lifecycle/bootstrap').then(result => {
+    if (!input.isConnected) return;
+    input.value = result.initialPassword;
+    app.querySelector('button[type=submit]').disabled = false;
+  }).catch(message);
   wireForm(async data => {
     initialPassword = String(data.get('password'));
     const result = await post('/lifecycle/login', { method: 'password', password: initialPassword });

@@ -2,7 +2,7 @@
 const base = window.__LIFECYCLE__?.basePath ?? '';
 let state;
 
-/** Retrieve browser-bound CSRF and public capabilities, never password or OTP secrets. */
+/** Retrieve browser-bound CSRF and public capabilities; initial credentials use a separate first-run request. */
 export async function refreshState() {
   const response = await fetch(base + '/lifecycle/state', { cache: 'no-store' });
   if (!response.ok) throw new Error('无法连接登录服务');

@@ -11,4 +11,4 @@ if (values['all-factors']) files.push(path.join(credentialDir(), 'otp.json'), li
 const suffix = '.reset-backup-' + Date.now();
 for (const file of files) if (existsSync(file)) renameSync(file, file + suffix);
 if (values['all-factors']) saveLifecyclePolicy({ ...readLifecyclePolicy(), twoFactor: false });
-console.log('Credentials moved to owner-only backup files. Start Harness, read its new initial password from the local log, and complete setup.');
+console.log('Credentials moved to owner-only backup files. Start Harness, refresh the page, and complete setup using the initial password shown on the setup page.');

@@ -100,6 +100,19 @@ test('fresh setup forces a new password before upstream access', async () => {
   assert.equal((await request('/api/private')).status, 200);
 });
 
+test('the setup credential is CSRF guarded and is no longer revealed after a mandatory password change', async () => {
+  await setPassword('Initial-Display-123!', { initial: true });
+  assert.equal((await request('/lifecycle/bootstrap', {})).status, 200);
+  assert.equal((await request('/lifecycle/bootstrap', {})).data.initialPassword, 'Initial-Display-123!');
+  assert.equal((await request('/lifecycle/bootstrap', {}, { 'X-Lifecycle-CSRF': 'wrong' })).status, 403);
+  assert.equal((await request('/lifecycle/state')).data.initialPassword, undefined);
+  await request('/lifecycle/login', { method: 'password', password: 'Initial-Display-123!' });
+  assert.equal((await request('/api/private')).status, 401);
+  assert.equal((await request('/lifecycle/password', { password: 'Initial-Display-123!', newPassword: 'Initial-Display-123!' })).status, 400);
+  await request('/lifecycle/password', { password: 'Initial-Display-123!', newPassword: 'Personal-New-456!' });
+  assert.equal((await request('/lifecycle/bootstrap', {})).status, 410);
+});
+
 test('wallpaper library requires Admin, persists selection across restart, and restores built-in on deletion', async () => {
   assert.equal((await request('/lifecycle/wallpapers')).status, 401);
   await request('/lifecycle/login', { method: 'password', password });

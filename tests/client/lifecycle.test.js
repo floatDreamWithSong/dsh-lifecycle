@@ -13,6 +13,22 @@ test('Windows power menu warns that stopping the process tree interrupts active 
   await expect(page.getByRole('menuitem', { name: /重新启动/ })).toHaveText(/停止并重新启动托管进程/);
 });
 
+test('a stale page shows a refresh instruction instead of treating the new auth gate as a connection failure', async ({ page, request }) => {
+  await reset(request);
+  await login(page);
+  await api(page, '/lifecycle/lock', {});
+  expect((await page.request.get('/api/private')).status()).toBe(401);
+  // Model the newly installed client activating over an already-loaded, unauthorized workspace.
+  await page.evaluate(() => window.__simulateLifecycleInstall());
+  const notice = page.getByRole('dialog', { name: '安装完成后需要刷新' });
+  await expect(notice).toHaveCount(1);
+  await expect(notice).toContainText('HTTP 401');
+  await expect(notice.getByRole('button', { name: '刷新并进入登录 / 设置' })).toBeFocused();
+  await page.screenshot({ path: 'test-results/install-refresh.png' });
+  await notice.getByRole('button', { name: '刷新并进入登录 / 设置' }).click();
+  await expect(page.getByRole('button', { name: '唤醒并登录 Admin' })).toBeVisible();
+});
+
 test('source-managed power menu shows its version and update policy without disabling restart', async ({ page, request }) => {
   await reset(request);await login(page);
   await page.route('**/api/dsh-lifecycle/power/status', route => route.fulfill({ json: {
@@ -88,7 +104,7 @@ test('same browser stays signed in after server restart; explicit lock returns t
 test('first-run OOBE creates a personal password and enters the workspace', async ({ page, request }) => {
   await reset(request, true);await page.goto('/login');
   await expect(page.getByRole('heading', { name: '从这里，开始你的工作空间' })).toBeVisible();await page.screenshot({ path: 'test-results/initial-setup.png' });
-  await page.getByLabel('初始密码', { exact: true }).fill(password);await page.getByRole('button', { name: '下一步 →' }).click();
+  await expect(page.getByLabel('初始密码', { exact: true })).toHaveValue(password);await page.getByRole('button', { name: '下一步 →' }).click();
   await page.getByLabel('新密码', { exact: true }).fill('Personal-Admin-456!');await page.getByLabel('确认密码', { exact: true }).fill('Personal-Admin-456!');
   await page.getByRole('button', { name: '下一步 →' }).click();await expect(page.getByRole('heading', { name: '选择你的登录方式' })).toBeVisible();
   await page.getByRole('button', { name: '下一步 →' }).click();await page.getByRole('button', { name: '进入工作空间 →' }).click();
@@ -102,7 +118,7 @@ test('mobile lock and focused sign-in fit the viewport', async ({ page, request 
 });
 test('OOBE binds OTP and enforces password followed by a separate OTP step', async ({ page, request }) => {
   await reset(request, true);await page.goto('/login');
-  await page.getByLabel('初始密码', { exact: true }).fill(password);await page.getByRole('button', { name: '下一步 →' }).click();
+  await expect(page.getByLabel('初始密码', { exact: true })).toHaveValue(password);await page.getByRole('button', { name: '下一步 →' }).click();
   const personal = 'Personal-OTP-456!';
   await page.getByLabel('新密码', { exact: true }).fill(personal);await page.getByLabel('确认密码', { exact: true }).fill(personal);await page.getByRole('button', { name: '下一步 →' }).click();
   await page.locator('#double-choice').click();await page.locator('#setup-next').click();

@@ -1,5 +1,13 @@
 # 部署与恢复
 
+## 安装后的首次访问
+
+**安装后先刷新页面。** 旧页面的连接提示及 HTTP 401 是登录验证切换后的预期现象，请访问 `/login` 进入首次设置或登录，不要误判为服务无法连接。客户端会在检测到尚未登录时显示醒目的刷新提示；如果旧页面尚未加载到插件客户端，请手动刷新。
+
+随机初始密码直接显示在首次设置页，终端不再输出密码。为支持刷新及服务重启后的首次设置，只有带 `initial` 标记的临时凭据会暂存在密码记录中；改为个人密码时删除临时明文，只保留个人密码的散列。旧版本尚未完成初始化、只有散列的初始凭据会在启动时重新随机生成，已完成改密的账户不受影响。
+
+**首次设置页不是身份验证边界：可访问者都能看到临时初始密码。** 请在本机或受控网络完成初始化后再对公网开放，避免其他访客抢先设置密码。页面展示不代表 Electron Desktop 已完成适配，当前仍仅支持 Web profile。
+
 本文面向管理员。示例假设 Harness 由 `deepseek-harness` 账户运行，systemd 服务为 `deepseek-harness.service`，安装在 `/opt/deepseek-harness`。请按实际环境替换，操作前备份 profile 和数据目录。
 
 ## 反向代理
@@ -130,7 +138,7 @@ npm 管理的独立安装用 `--install-root 'C:\DSH\harness' --npm-cli 'C:\Prog
 电源面板会提醒停止整个托管进程树会中断运行中的任务。关机只停止 Harness，不关闭 Windows，独立控制服务继续运行。Windows 停止属于强制结束，不等同于 Unix 的优雅退出；已完成登录会持久保存，但正在运行的模型请求、工具和未提交写入可能中断。源码构建不会自动更新或覆盖仓库。
 
 ```powershell
-# 查看启动日志和初始密码；不要公开日志内容
+# 查看启动诊断；初始密码在首次设置页展示，不在日志输出
 Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\harness.log" -Tail 60 -Encoding utf8
 # 页面关机后手动启动
 $config = Get-Content "$env:LOCALAPPDATA\dsh-lifecycle\config.json" -Raw -Encoding utf8 | ConvertFrom-Json
@@ -166,7 +174,7 @@ sudo -u deepseek-harness env \
 sudo systemctl start deepseek-harness.service
 ```
 
-默认只重置密码和会话，保留第二因素。仅在密码和全部第二因素都丢失时，再加 `--all-factors`。工具将受影响文件移为同目录备份；随后从服务日志获取新初始密码。备份同样需要妥善保护。不要在服务运行时手工替换凭据文件。
+默认只重置密码和会话，保留第二因素。仅在密码和全部第二因素都丢失时，再加 `--all-factors`。工具将受影响文件移为同目录备份；随后从首次设置页获取新初始密码，并立即完成改密。备份同样需要妥善保护。不要在服务运行时手工替换凭据文件。
 
 ## Passkey 域名
 

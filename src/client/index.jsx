@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import css from './style.css';
 import securityCSS from '../security/style.css';
 import { mountSecurity } from '../security/index.js';
+import { mountReloadNotice } from './reload-notice.js';
 
 export const inject = ['slots', 'layout'];
 const BASE = '/api/dsh-lifecycle/power';
@@ -213,6 +214,7 @@ export function apply(ctx) {
     const style = document.createElement('style'); style.textContent = css + securityCSS; document.head.appendChild(style);
     return () => { style.remove(); publish({ action: null, operationId: null }); };
   });
+  ctx.effect(() => mountReloadNotice());
   const openSecurity = () => ctx.layout.selectPanel('dsh-lifecycle-security');
   const PowerEntry = props => <PowerMenu {...props} openSecurity={openSecurity}/>;
   function SecurityPanel() {
