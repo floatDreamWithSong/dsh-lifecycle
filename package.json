@@ -1,7 +1,7 @@
 {
   "name": "dsh-lifecycle",
-  "version": "0.1.10",
-  "description": "安装后请立即刷新页面进入登录/首次设置；旧页面显示无法连接或 HTTP 401 不代表安装失败。DeepSeek Harness Web 锁屏、持久登录及电源管理，Windows 支持页面一键启用后台服务。",
+  "version": "0.1.11",
+  "description": "仅支持 DeepSeek Harness Web 版，不支持 Electron Desktop；专为 Web profile 设计，请勿安装到桌面版。安装后立即刷新进入登录/首次设置，401 不代表安装失败。提供 Web 锁屏、持久登录及电源管理，Windows 支持仅指 Windows Web 版。",
   "type": "module",
   "main": "./index.js",
   "exports": {
